@@ -385,7 +385,7 @@ export async function rejectReservation(req, res) {
       if (reviewer.role === req.user.role) {
         found = true;
         reviewer.status = "REJECTED";
-        if (req.body.comments) reviewer.comments = req.body.comments;
+        reviewer.comments = `Rejection Reason: ${req.body.reason || "No reason provided"}`;
       }
       return reviewer;
     });
@@ -394,7 +394,7 @@ export async function rejectReservation(req, res) {
       reservation.reviewers.push({
         role: req.user.role,
         status: "REJECTED",
-        comments: req.body.comments || "",
+        comments: `Rejection Reason: ${req.body.reason || "No reason provided"}`,
       });
     }
     let initStatus = reservation.status;
@@ -402,28 +402,15 @@ export async function rejectReservation(req, res) {
     if (initStatus !== reservation.status) {
       const resUser = await User.findOne({ email: reservation.guestEmail });
       if (resUser.notifications == null) {
-        // console.log()
         resUser.notifications = [];
       }
       resUser.notifications.push({
-        message: `Reservation Status changed to ${reservation.status} - ${
-          req.body.comments || "No comments"
-        }`,
+        message: `Reservation Status changed to ${reservation.status} - Reason: ${req.body.reason || "No reason provided"}`,
         sender: req.user.role,
         res_id: reservation._id,
       });
       await resUser.save();
     }
-
-    // const body =
-    //   "<div>Your reservation has been rejected</div><br><div>Comments: " +
-    //   req.body.comments +
-    //   "</div>";
-    // sendVerificationEmail(
-    //   reservation.guestEmail,
-    //   "Reservation status updated",
-    //   body
-    // );
 
     await reservation.save();
     res.status(200).json({ message: "Reservation Rejected" });

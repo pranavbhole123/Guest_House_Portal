@@ -18,6 +18,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import http from "../utils/httpService";
 import { useSelector } from "react-redux";
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 
 export default function AdminRecordList({ status = "pending" }) {
   const [checked, setChecked] = useState([]);
@@ -27,8 +31,12 @@ export default function AdminRecordList({ status = "pending" }) {
   const [newRecords, setNewRecords] = useState([]);
   const [sortType, setSortType] = useState("");
   const [sortToggle, setSortToggle] = useState(false);
+  const [openRejectDialog, setOpenRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
 
   const user = useSelector((state) => state.user);
+  const isAdminOrChairman = user.role === "ADMIN" || user.role === "CHAIRMAN";
 
   const filterMap = {
     "Guest Name": "guestName",
@@ -210,6 +218,44 @@ export default function AdminRecordList({ status = "pending" }) {
     handleSort();
   }, [sortToggle, sortType]);
 
+  const handleRejectClick = (recordId) => {
+    setSelectedRecordId(recordId);
+    setOpenRejectDialog(true);
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+
+    try {
+      if (selectedRecordId === null) {
+        // Handle bulk rejection
+        for (const record of checked) {
+          if (record !== "#") {
+            await http.put(`/reservation/reject/${record}`, { reason: rejectReason });
+          }
+        }
+        toast.success("Requests Rejected");
+      } else {
+        // Handle single rejection
+        await http.put(`/reservation/reject/${selectedRecordId}`, { reason: rejectReason });
+        toast.success("Request Rejected");
+      }
+      window.location.reload();
+    } catch (error) {
+      if (error.response?.data?.message) {
+        toast.error(error.response.data);
+      } else {
+        toast.error("An error occurred");
+      }
+    }
+    setOpenRejectDialog(false);
+    setRejectReason("");
+    setSelectedRecordId(null);
+  };
+
   return (
     <div className="flex p-2 px-0 w-full flex-col">
       <div className='text-center text-2xl font-["Dosis"] font-semibold py-2 uppercase'>
@@ -295,7 +341,7 @@ export default function AdminRecordList({ status = "pending" }) {
               Room Assigned
             </div>
             <div className="flex justify-evenly gap-2 w-[10%]">
-              { checked.length > 0 && (
+              { checked.length > 0 && isAdminOrChairman && (
                 <div className="flex">
                   <IconButton edge="end" aria-label="comments">
                     <DoneIcon
@@ -318,22 +364,9 @@ export default function AdminRecordList({ status = "pending" }) {
                   <IconButton edge="end" aria-label="comments">
                     <CloseIcon
                       className="text-red-400 h-5 ml-2"
-                      onClick={async () => {
-                        try {
-                          checked.forEach(async (record) => {
-                            if (record !== "#") {
-                              await http.put("/reservation/reject/" + record);
-                            }
-                          });
-                          toast.success("Requests Rejected");
-                          window.location.reload();
-                        } catch (error) {
-                          if (error.response?.data?.message) {
-                            toast.error(error.response.data);
-                          } else {
-                            toast.error("An error occurred");
-                          }
-                        }
+                      onClick={() => {
+                        setSelectedRecordId(null);
+                        setOpenRejectDialog(true);
                       }}
                     />
                   </IconButton>
@@ -372,15 +405,13 @@ export default function AdminRecordList({ status = "pending" }) {
                   {record.bookings?.length > 0 && <div className="w-[10%]">Yes</div>}
                   {record.bookings?.length <= 0 && <div className="w-[10%]">No</div>}
                   <div className="flex justify-evenly gap-2 w-[10%]">
-                    { status !== "approved" && (
+                    { status !== "approved" && isAdminOrChairman && (
                       <IconButton edge="end" aria-label="comments">
                         <DoneIcon
                           className="text-green-500 h-5"
                           onClick={async () => {
                             try {
-                              await http.put(
-                                "/reservation/approve/" + record._id
-                              );
+                              await http.put("/reservation/approve/" + record._id);
                               toast.success("Reservation Approved");
                               window.location.reload();
                             } catch (error) {
@@ -394,18 +425,11 @@ export default function AdminRecordList({ status = "pending" }) {
                         />
                       </IconButton>
                     )}
-                    { status !== "rejected" && (
+                    { status !== "rejected" && isAdminOrChairman && (
                       <IconButton edge="end" aria-label="comments">
                         <CloseIcon
                           className="text-red-500 h-5"
-                          onClick={async () => {
-                            try {
-                              await http.put(
-                                "/reservation/reject/" + record._id
-                              );
-                              window.location.reload();
-                            } catch (error) {}
-                          }}
+                          onClick={() => handleRejectClick(record._id)}
                         />
                       </IconButton>
                     )}
@@ -458,6 +482,92 @@ export default function AdminRecordList({ status = "pending" }) {
           Error fetching records!
         </div>
       )}
+
+      <Dialog 
+        open={openRejectDialog} 
+        onClose={() => setOpenRejectDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          style: {
+            borderRadius: '12px',
+            padding: '12px',
+          },
+        }}
+      >
+        <DialogTitle sx={{
+          fontSize: '1.5rem',
+          fontWeight: 600,
+          color: '#365899',
+          borderBottom: '1px solid #e5e7eb',
+          padding: '16px 24px',
+        }}>
+          Reject Reservation
+        </DialogTitle>
+        <DialogContent sx={{ 
+          padding: '24px',
+          paddingTop: '24px !important',
+        }}>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Reason for Rejection"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            required
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&:hover fieldset': {
+                  borderColor: '#365899',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#365899',
+                },
+              },
+              '& .MuiInputLabel-root.Mui-focused': {
+                color: '#365899',
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ 
+          padding: '16px 24px',
+          borderTop: '1px solid #e5e7eb',
+          gap: '12px'
+        }}>
+          <Button 
+            onClick={() => setOpenRejectDialog(false)}
+            sx={{
+              textTransform: 'none',
+              padding: '8px 20px',
+              borderRadius: '6px',
+              fontWeight: 500,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleRejectConfirm} 
+            variant="contained"
+            color="error"
+            sx={{
+              textTransform: 'none',
+              padding: '8px 20px',
+              borderRadius: '6px',
+              fontWeight: 500,
+              '&:hover': {
+                backgroundColor: '#dc2626',
+              },
+            }}
+          >
+            Reject
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

@@ -16,12 +16,18 @@ import DownloadIcon from "@mui/icons-material/Download";
 import DoneIcon from "@mui/icons-material/Done";
 import CloseIcon from "@mui/icons-material/Close";
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import FolderIcon from '@mui/icons-material/Folder';
+import DescriptionIcon from '@mui/icons-material/Description';
+import { CircularProgress, ListItem, ListItemIcon, ListItemText, Divider } from "@mui/material";
 import http from "../utils/httpService";
 import { useSelector } from "react-redux";
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Typography from '@mui/material/Typography';
+import JSZip from 'jszip';
 
 export default function AdminRecordList({ status = "pending" }) {
   const [checked, setChecked] = useState([]);
@@ -34,6 +40,14 @@ export default function AdminRecordList({ status = "pending" }) {
   const [openRejectDialog, setOpenRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [selectedRecordId, setSelectedRecordId] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewFileName, setPreviewFileName] = useState("");
+  const [zipContents, setZipContents] = useState([]);
+  const [isZipFile, setIsZipFile] = useState(false);
+  const [loadingZip, setLoadingZip] = useState(false);
+  const [selectedZipContent, setSelectedZipContent] = useState(null);
+  const [selectedContentData, setSelectedContentData] = useState(null);
 
   const user = useSelector((state) => state.user);
   const isAdminOrChairman = user.role === "ADMIN" || user.role === "CHAIRMAN";
@@ -256,6 +270,99 @@ export default function AdminRecordList({ status = "pending" }) {
     setSelectedRecordId(null);
   };
 
+  // Function to process zip file contents
+  const processZipFile = async (blob) => {
+    setLoadingZip(true);
+    try {
+      const zip = new JSZip();
+      const zipData = await zip.loadAsync(blob);
+      
+      const contents = [];
+      
+      // Process files and folders
+      for (const [path, file] of Object.entries(zipData.files)) {
+        if (!file.dir) {
+          const extension = path.split('.').pop().toLowerCase();
+          const isViewable = ['txt', 'md', 'json', 'js', 'jsx', 'html', 'css', 'xml', 'csv', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(extension);
+          
+          contents.push({
+            path,
+            name: path.split('/').pop(),
+            dir: file.dir,
+            date: new Date(file.date).toLocaleString(),
+            size: file.dir ? '-' : formatFileSize(file._data.uncompressedSize),
+            isViewable
+          });
+        } else {
+          // Add folder entry
+          contents.push({
+            path,
+            name: path,
+            dir: true,
+            date: new Date(file.date).toLocaleString(),
+            size: '-',
+            isViewable: false
+          });
+        }
+      }
+      
+      setZipContents(contents);
+      setLoadingZip(false);
+    } catch (error) {
+      console.error("Error processing zip file:", error);
+      toast.error("Failed to process zip file");
+      setLoadingZip(false);
+    }
+  };
+
+  // Helper function to format file size
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Function to view content of a file within the zip
+  const viewZipContent = async (item) => {
+    setSelectedZipContent(item);
+    setLoadingZip(true);
+    
+    try {
+      const zip = new JSZip();
+      const zipData = await zip.loadAsync(await fetch(previewUrl).then(res => res.blob()));
+      
+      // Get the file extension
+      const fileExtension = item.path.split('.').pop().toLowerCase();
+      
+      if (fileExtension === 'pdf') {
+        // For PDF files, extract as array buffer and create a blob URL
+        const pdfData = await zipData.file(item.path).async("arraybuffer");
+        const pdfBlob = new Blob([pdfData], { type: 'application/pdf' });
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        setSelectedContentData(pdfUrl);
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(fileExtension)) {
+        // For image files, extract as base64 and create a data URL
+        const imageData = await zipData.file(item.path).async("base64");
+        const mimeType = `image/${fileExtension === 'svg' ? 'svg+xml' : fileExtension}`;
+        setSelectedContentData(`data:${mimeType};base64,${imageData}`);
+      } else if (item.isViewable) {
+        // For text files, extract as string
+        const fileData = await zipData.file(item.path).async("string");
+        setSelectedContentData(fileData);
+      } else {
+        toast.info("This file type cannot be previewed");
+      }
+      
+      setLoadingZip(false);
+    } catch (error) {
+      console.error("Error reading file from zip:", error);
+      toast.error("Failed to read file");
+      setLoadingZip(false);
+    }
+  };
+
   return (
     <div className="flex p-2 px-0 w-full flex-col">
       <div className='text-center text-2xl font-["Dosis"] font-semibold py-2 uppercase'>
@@ -304,7 +411,7 @@ export default function AdminRecordList({ status = "pending" }) {
         className="bg-gray-50 border rounded-md  overflow-hidden"
       >
         <div className="font-semibold border-b-2 text-[1.13vw] w-full" key="#">
-          <div className="p-1 px-4 flex gap-4 w-full items-center text-center">
+          <div className="p-1 px-4 flex gap-4 w-full items-center text-center justify-around">
             <div className="flex items-center gap-2 w-[15%]">
               <Checkbox
                 edge="start"
@@ -334,13 +441,34 @@ export default function AdminRecordList({ status = "pending" }) {
             <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
               Departure Date
             </div>
-            <div onClick={handleSortToggle} className="w-[9%] ">
+            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
               Room Type
             </div>
             <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
               Room Assigned
             </div>
-            <div className="flex justify-evenly gap-2 w-[10%]">
+            <div className="flex justify-evenly gap-4 w-[10%]">
+              { checked.length === 0 && (
+                <>
+                  <IconButton>
+                    <InsertDriveFileIcon />
+                  </IconButton>
+                  <IconButton>
+                    <VisibilityIcon />
+                  </IconButton>
+                  { isAdminOrChairman && (
+                    <>
+                      <IconButton>
+                        <DoneIcon className="text-green-500" />
+                      </IconButton>
+                      <IconButton>
+                        <CloseIcon className="text-red-500" />
+                      </IconButton>
+                    </>
+                  )}
+                </>
+              )}
+              
               { checked.length > 0 && isAdminOrChairman && (
                 <div className="flex">
                   <IconButton edge="end" aria-label="comments">
@@ -383,7 +511,7 @@ export default function AdminRecordList({ status = "pending" }) {
               return (
                 <div
                   key={record._id}
-                  className="border-b-[1px] border-gray-100 items-center flex gap-4 text-center px-4 p-1 text-[1vw]"
+                  className="border-b-[1px] border-gray-100 items-center flex gap-4 text-center px-4 p-1 text-[1vw] justify-around"
                 >
                   <div className="flex items-center gap-2 w-[15%] overflow-hidden">
                     <Checkbox
@@ -404,11 +532,59 @@ export default function AdminRecordList({ status = "pending" }) {
                   <div className="w-[10%]">{record.roomType}</div>
                   {record.bookings?.length > 0 && <div className="w-[10%]">Yes</div>}
                   {record.bookings?.length <= 0 && <div className="w-[10%]">No</div>}
-                  <div className="flex justify-evenly gap-2 w-[10%]">
+                  <div className="flex justify-evenly gap-4 w-[10%]">
+                    <IconButton edge="end" aria-label="file">
+                      <InsertDriveFileIcon
+                        onClick={() => {
+                          window.location.pathname.split("/").length === 3
+                            ? navigate(`${record._id}`)
+                            : navigate(`../${record._id}`);
+                        }}
+                        color="black"
+                      />
+                    </IconButton>
+                    <IconButton edge="end" aria-label="preview">
+                      <VisibilityIcon
+                        onClick={async () => {
+                          try {
+                            setLoadingZip(true);
+                            const res = await http.get(
+                              "/reservation/documents/" + record._id,
+                              { responseType: "blob" }
+                            );
+                            const fileName = record.name || "Document";
+                            const contentType = res.headers["content-type"] || res.data.type;
+                            
+                            // Check if it's a zip file
+                            const isZip = contentType && (
+                              contentType.includes("zip") || 
+                              contentType.includes("application/octet-stream")
+                            );
+                            setIsZipFile(isZip);
+                            
+                            const file = window.URL.createObjectURL(res.data);
+                            setPreviewUrl(file);
+                            setPreviewFileName(`${fileName} (${contentType})`);
+                            
+                            if (isZip) {
+                              // Process zip file contents
+                              await processZipFile(res.data);
+                            }
+                            
+                            setPreviewOpen(true);
+                            setLoadingZip(false);
+                          } catch (error) {
+                            setLoadingZip(false);
+                            toast.error("Something went wrong");
+                          }
+                        }}
+                        color="black"
+                      />
+                    </IconButton>
                     { status !== "approved" && isAdminOrChairman && (
-                      <IconButton edge="end" aria-label="comments">
+                      <IconButton edge="end" aria-label="approve">
                         <DoneIcon
-                          className="text-green-500 h-5"
+                          className="text-green-500"
                           onClick={async () => {
                             try {
                               await http.put("/reservation/approve/" + record._id);
@@ -426,40 +602,13 @@ export default function AdminRecordList({ status = "pending" }) {
                       </IconButton>
                     )}
                     { status !== "rejected" && isAdminOrChairman && (
-                      <IconButton edge="end" aria-label="comments">
+                      <IconButton edge="end" aria-label="reject">
                         <CloseIcon
-                          className="text-red-500 h-5"
+                          className="text-red-500"
                           onClick={() => handleRejectClick(record._id)}
                         />
                       </IconButton>
                     )}
-                    <IconButton edge="end" aria-label="insert">
-                      <InsertDriveFileIcon
-                        onClick={() => {
-                          status === "approved"
-                            ? navigate(`${record._id}`)
-                            : navigate(`../${record._id}`);
-                        }}
-                        color="black"
-                      />
-                    </IconButton>
-                    <IconButton edge="end" aria-label="download">
-                      <DownloadIcon
-                        onClick={async () => {
-                          try {
-                            const res = await http.get(
-                              "/reservation/documents/" + record._id,
-                              { responseType: "blob" }
-                            );
-                            var file = window.URL.createObjectURL(res.data);
-                            window.location.assign(file);
-                          } catch (error) {
-                            toast.error("Something went wrong");
-                          }
-                        }}
-                        color="black"
-                      />
-                    </IconButton>
                   </div>
 
                   <div />
@@ -566,6 +715,210 @@ export default function AdminRecordList({ status = "pending" }) {
           >
             Reject
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog
+        open={previewOpen}
+        onClose={() => {
+          setPreviewOpen(false);
+          setSelectedZipContent(null);
+          setSelectedContentData(null);
+          setZipContents([]);
+        }}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          {previewFileName}
+          <IconButton
+            aria-label="close"
+            onClick={() => {
+              setPreviewOpen(false);
+              setSelectedZipContent(null);
+              setSelectedContentData(null);
+              setZipContents([]);
+            }}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {loadingZip ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+              <CircularProgress />
+            </div>
+          ) : (
+            <>
+              {isZipFile ? (
+                <div>
+                  {selectedZipContent ? (
+                    <div>
+                      <Button 
+                        variant="outlined" 
+                        startIcon={<ArrowDropUpIcon />}
+                        onClick={() => {
+                          setSelectedZipContent(null);
+                          setSelectedContentData(null);
+                        }}
+                        sx={{ mb: 2 }}
+                      >
+                        Back to file list
+                      </Button>
+                      <Typography variant="h6">
+                        {selectedZipContent.name}
+                      </Typography>
+                      <Divider sx={{ my: 1 }} />
+                      
+                      {selectedZipContent.path.toLowerCase().endsWith('.pdf') ? (
+                        <iframe
+                          src={selectedContentData}
+                          style={{ width: '100%', height: '500px' }}
+                          frameBorder="0"
+                        />
+                      ) : selectedZipContent.path.toLowerCase().match(/\.(jpe?g|png|gif|bmp|svg)$/i) ? (
+                        <div style={{ textAlign: 'center', padding: '10px' }}>
+                          <img 
+                            src={selectedContentData} 
+                            alt={selectedZipContent.name}
+                            style={{ maxWidth: '100%', maxHeight: '500px' }}
+                          />
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          backgroundColor: '#f5f5f5', 
+                          padding: '10px', 
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          whiteSpace: 'pre-wrap',
+                          overflowX: 'auto',
+                          maxHeight: '400px',
+                          overflowY: 'auto'
+                        }}>
+                          {selectedContentData}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <Typography variant="h6" gutterBottom>
+                        Zip File Contents
+                      </Typography>
+                      <List sx={{ width: '100%', bgcolor: 'background.paper', maxHeight: '400px', overflow: 'auto' }}>
+                        {zipContents.map((item, index) => (
+                          <ListItem
+                            key={index}
+                            button={item.isViewable}
+                            onClick={() => item.isViewable && viewZipContent(item)}
+                            sx={{ 
+                              cursor: item.isViewable ? 'pointer' : 'default',
+                              '&:hover': {
+                                bgcolor: item.isViewable ? 'rgba(0, 0, 0, 0.04)' : 'transparent'
+                              }
+                            }}
+                          >
+                            <ListItemIcon>
+                              {item.dir ? <FolderIcon color="primary" /> : <DescriptionIcon color="primary" />}
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={item.name} 
+                              secondary={`${item.size} | ${item.date}`}
+                            />
+                            {!item.dir && (
+                              <div className="flex gap-2">
+                                {item.isViewable && (
+                                  <Button size="small" variant="outlined" onClick={(e) => {
+                                    e.stopPropagation();
+                                    viewZipContent(item);
+                                  }}>
+                                    VIEW
+                                  </Button>
+                                )}
+                                <Button 
+                                  size="small" 
+                                  variant="outlined"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const zip = new JSZip();
+                                      const zipData = await zip.loadAsync(await fetch(previewUrl).then(res => res.blob()));
+                                      const fileData = await zipData.file(item.path).async("arraybuffer");
+                                      const fileBlob = new Blob([fileData], { type: 'application/octet-stream' });
+                                      const fileUrl = URL.createObjectURL(fileBlob);
+                                      
+                                      // Create a temporary link element and trigger download
+                                      const a = document.createElement('a');
+                                      a.href = fileUrl;
+                                      a.download = item.name;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      URL.revokeObjectURL(fileUrl);
+                                    } catch (error) {
+                                      console.error("Error downloading file:", error);
+                                      toast.error("Failed to download file");
+                                    }
+                                  }}
+                                >
+                                  DOWNLOAD
+                                </Button>
+                              </div>
+                            )}
+                          </ListItem>
+                        ))}
+                      </List>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <iframe
+                  src={previewUrl}
+                  style={{ width: '100%', height: '500px' }}
+                  frameBorder="0"
+                />
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setPreviewOpen(false);
+              setSelectedZipContent(null);
+              setSelectedContentData(null);
+              setZipContents([]);
+            }} 
+            color="primary"
+          >
+            CLOSE
+          </Button>
+          {zipContents.length > 0 && (
+            <Button 
+              onClick={async () => {
+                try {
+                  // Create a temporary link element and trigger download of the full zip
+                  const a = document.createElement('a');
+                  a.href = previewUrl;
+                  a.download = previewUrl.split('/').pop();
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                } catch (error) {
+                  console.error("Error downloading ZIP file:", error);
+                  toast.error("Failed to download ZIP file");
+                }
+              }} 
+              color="primary"
+            >
+              DOWNLOAD AS ZIP
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </div>

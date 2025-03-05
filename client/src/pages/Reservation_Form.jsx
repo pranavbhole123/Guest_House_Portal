@@ -104,6 +104,7 @@ function ReservationForm() {
     departureTime: /[\s\S]*/,
     purpose: /[\s\S]*/,
     category: /[\s\S]*/,
+    mobile: /^\d{10}$/,
   };
 
   const categoryInfo = {
@@ -241,8 +242,34 @@ function ReservationForm() {
     const receipt = await updateFilledPDF(formData);
 
     //Handle form validation
-
     let passed = true;
+
+    // Validate mobile number
+    if (!formData.applicant.mobile.match(/^\d{10}$/)) {
+      toast.error("Mobile number must be exactly 10 digits");
+      return;
+    }
+
+    // Calculate max allowed arrival date (today + 3 months)
+    const maxArrivalDate = new Date();
+    maxArrivalDate.setMonth(maxArrivalDate.getMonth() + 3);
+
+    // Get arrival and departure dates
+    const arrivalDateTime = new Date(`${formData.arrivalDate}T${formData.arrivalTime}`);
+    const departureDateTime = new Date(`${formData.departureDate}T${formData.departureTime}`);
+
+    // Check if arrival date is within allowed range
+    if (arrivalDateTime > maxArrivalDate) {
+      toast.error("Booking can only be made up to 3 months in advance");
+      return;
+    }
+
+    // Calculate stay duration in days
+    const stayDuration = (departureDateTime - arrivalDateTime) / (1000 * 60 * 60 * 24);
+    if (stayDuration > 10) {
+      toast.error("Maximum booking duration is 10 days");
+      return;
+    }
 
     for (let [key, value] of Object.entries(formData)) {
       if (key === "files" || key === "receipt") {
@@ -267,13 +294,6 @@ function ReservationForm() {
         }));
       }
     }
-
-    const arrivalDateTime = new Date(
-      `${formData.arrivalDate}T${formData.arrivalTime}`
-    );
-    const departureDateTime = new Date(
-      `${formData.departureDate}T${formData.departureTime}`
-    );
 
     // Check if no of rooms are Sufficient for Double occupancy
     if (formData.roomType === "Double Occupancy") {
@@ -526,6 +546,7 @@ function ReservationForm() {
               value={formData.arrivalDate}
               onChange={handleChange}
               min={new Date(Date.now()).toISOString().split("T")[0]}
+              max={new Date(2999, 11, 31).toISOString().split("T")[0]}
             />
           </div>
 
@@ -546,6 +567,7 @@ function ReservationForm() {
               value={formData.departureDate}
               onChange={handleChange}
               min={new Date(Date.now()).toISOString().split("T")[0]}
+              max={new Date(2999, 11, 31).toISOString().split("T")[0]}
             />
           </div>
           <div className="form-group">

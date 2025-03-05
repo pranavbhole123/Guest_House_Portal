@@ -1,0 +1,70 @@
+.room-booking {
+  text-align: center;
+  margin: 20px;
+}
+
+.room-heading {
+  margin-bottom: 20px;
+}
+
+.filter-container {
+  display: flex;
+  align-items: center;
+  /* justify-content: center; */
+  gap: 4rem;
+  margin-bottom: 20px;
+}
+
+.filter-label {
+  margin-right: 10px;
+}
+
+.filter-input {
+  margin-right: 10px;
+  padding: 5px;
+}
+
+.filter-button {
+  padding: 5px 10px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Increase min width for room */
+  grid-gap: 20px; /* Increased gap between rooms */
+  margin-top: 20px;
+}
+
+.room {
+  position: relative;
+}
+
+.room .room-info {
+  padding: 20px; /* Increased padding for room */
+  transition: background-color 0.3s ease;
+}
+
+
+
+.room .booking-info {
+  display: none;
+  background-color: rgba(0, 0, 0, 0.8);
+  /* background-color: #800000; */
+  color: white;
+  padding: 10px;
+  border-radius: 5px;
+  position: absolute;
+  top: calc(100% + 10px); /* Move the info below the room */
+  left: 0;
+  width: 100%;
+  transition: opacity 0.3s ease;
+  z-index: 999; /* Ensure booking info is above other elements */
+}
+
+.room:hover .booking-info {
+  display: block;
+}

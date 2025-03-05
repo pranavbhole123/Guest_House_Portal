@@ -1,0 +1,45 @@
+.reservation-container {
+  margin: 0 auto;
+  margin-top: 20px;
+  padding: 20px;
+}
+
+.form-group {
+  /* margin-bottom: 20px; */
+  margin-bottom: 0 !important;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px !important;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.submit-btn,
+.convert-to-pdf-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 20px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.submit-btn:disabled {
+  background-color: #3694f9;
+  cursor: not-allowed;
+}
+
+.submit-btn:hover,
+.convert-to-pdf-btn:hover {
+  background-color: #0056b3;
+}

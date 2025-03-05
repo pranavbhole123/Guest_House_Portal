@@ -1,0 +1,66 @@
+.sidebar {
+    /* position: fixed; */
+    /* position: relative; */
+    left: 0;
+    top: 48px; /* Adjusted to start below the header */
+    height: 100%; /* Adjust height to account for header */
+    width: 250px;
+    background: linear-gradient(to bottom,#365899, #365899); /* Light blue gradient */
+    padding: 20px;
+    border-right: 1px solid #ccc; /* Adding partition */
+    display: flex; /* Use flexbox to arrange items vertically */
+    flex-direction: column; /* Arrange items in a column */
+  }
+  
+  .sidebar-content {
+    flex: 1; /* Let the content area fill remaining space */
+  }
+  
+  .sidebar-menu {
+    list-style-type: none;
+    padding: 0;
+    margin: 0; /* Updated: Ensure no default margin */
+  
+  }
+  
+  .menu-item {
+    padding: 10px 5px; /* Adjust vertical padding between items */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    
+  }
+  
+  .menu-item:hover {
+    background-color: rgba(221,221,221,0.4);
+  }
+  
+  .menu-item:not(:last-child) {
+    border-bottom: 1px solid #ccc; /* Optional: Add border between items */
+  }
+  
+  
+  /* Adjustments for the icon and its position */
+  .header-icon {
+    cursor: pointer;
+    position: absolute;
+    top: 20px; /* Adjust as needed */
+    left: 20px; /* Adjust as needed */
+  }
+  .closed{
+    width: 0px;
+    overflow: hidden;
+  }
+  
+  .sidebar-menu-closed{
+    display: none;
+  }
+  
+/*   
+  
+  
+  
+  
+  *{
+    transition: all 0.3s ease;
+  }
+   */

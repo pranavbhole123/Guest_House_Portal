@@ -1,0 +1,41 @@
+/* Footer.css */
+
+
+  .footer-section h4 {
+    margin-bottom: 1rem;
+  }
+  
+  .footer-section ul {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .footer-section ul li a {
+    color: #ffffff;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+  
+  .footer-section ul li a:hover {
+    color: #ffdd00; /* Highlight color on hover */
+  }
+  
+  .footer-section p, .footer-section ul li {
+    /* font-size: 0.9rem; */
+    line-height: 1.6;
+  }
+
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .footer {
+      flex-direction: column;
+      align-items: center;
+    }
+  
+    .footer-section {
+      margin: 1rem 0;
+      text-align: center;
+    }
+  }
+

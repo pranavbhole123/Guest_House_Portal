@@ -1,0 +1,11 @@
+#outlined-basic::placeholder {
+  font-size: 5px;
+}
+
+.login-container{
+  background: url("./../images/bg.jpeg");
+  background-size: cover;
+  background-position: center;
+  background-position-y: -100px;
+  /* opacity: 0.5; */
+}

@@ -170,6 +170,10 @@ const reservationSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    lastModified: {
+      type: Date,
+      default: Date.now
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt timestamps

@@ -11,6 +11,9 @@ import {
   appendReservationToSheet,
   appendReservationToSheetAfterCheckout,
 } from "./google_sheet.js";
+import { GridFSBucket } from "mongodb";
+import pkg from "mongodb";
+const { ObjectId } = pkg;
 
 const googleSheets = google.sheets("v4");
 const auth = new google.auth.JWT(
@@ -1011,4 +1014,136 @@ export const getDiningAmount = async (req, res) => {
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
+};
+
+export const editReservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Log incoming request for debugging
+    console.log('Files received:', req.files);
+    console.log('Body received:', req.body);
+    
+    // Get the existing reservation
+    const existingReservation = await Reservation.findById(id);
+    if (!existingReservation) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+    
+    let applicantData = req.body.applicant;
+    if (typeof applicantData === "string") {
+      try {
+        applicantData = JSON.parse(applicantData);
+      } catch (err) {
+        console.error("Error parsing applicant JSON:", err);
+        return res.status(400).json({ message: "Invalid applicant JSON format" });
+      }
+    }
+
+    // Handle file uploads
+    let newFiles = [];
+    if (req.files?.files) {
+      // Handle single file
+      if (!Array.isArray(req.files.files)) {
+        const file = req.files.files;
+        newFiles.push({
+          refid: file.id,
+          extension: file.originalname.split('.').pop()
+        });
+      } 
+      // Handle multiple files
+      else {
+        newFiles = req.files.files.map(file => ({
+          refid: file.id,
+          extension: file.originalname.split('.').pop()
+        }));
+      }
+    }
+
+    // Calculate room cost
+    const ms = Number(
+      new Date(req.body.departureDate).getTime() - new Date(req.body.arrivalDate).getTime()
+    );
+    const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+    let room_cost = 0;
+
+    if (req.body.roomType === "Single Occupancy") {
+      if (req.body.category === "A") room_cost = 0;
+      else if (req.body.category === "B") room_cost = 600 * req.body.numberOfRooms * days;
+      else if (req.body.category === "C") room_cost = 900 * req.body.numberOfRooms * days;
+      else if (req.body.category === "D") room_cost = 1300 * req.body.numberOfRooms * days;
+    } else {
+      if (req.body.category === "A") room_cost = 0;
+      else if (req.body.category === "B") room_cost = 850 * req.body.numberOfRooms * days;
+      else if (req.body.category === "C") room_cost = 1250 * req.body.numberOfRooms * days;
+      else if (req.body.category === "D") room_cost = 1800 * req.body.numberOfRooms * days;
+    }
+
+    console.log('Calculated room cost:', room_cost);
+    console.log('Days:', days);
+    console.log('Room type:', req.body.roomType);
+    console.log('Category:', req.body.category);
+    console.log('Number of rooms:', req.body.numberOfRooms);
+
+    // Validate files for categories A and B
+    if ((req.body.category === 'A' || req.body.category === 'B') && 
+        newFiles.length === 0 && 
+        (!existingReservation.files || existingReservation.files.length === 0)) {
+      return res.status(400).json({ 
+        message: "Supporting documents are required for Category A and B" 
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      ...req.body,
+      applicant: applicantData,
+      status: "PENDING",
+      stepsCompleted: 1,
+      reviewers: [],
+      files: [...(existingReservation.files || []), ...newFiles],
+      payment: {
+        ...existingReservation.payment,
+        amount: room_cost,
+        status: "PENDING",
+        source: req.body.source || existingReservation.payment.source
+      }
+    };
+
+    // Update the reservation
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    );
+
+    console.log('Updated reservation:', updatedReservation);
+    res.status(200).json({
+      message: "Reservation updated successfully",
+      reservation: updatedReservation
+    });
+
+  } catch (error) {
+    console.error("Error updating reservation:", error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Helper function to calculate room cost
+const calculateRoomCost = (category, roomType, numberOfRooms, days) => {
+  let baseRate = 0;
+  
+  if (roomType === "Single Occupancy") {
+    if (category === "A") baseRate = 0;
+    else if (category === "B") baseRate = 600;
+    else if (category === "C") baseRate = 900;
+    else if (category === "D") baseRate = 1300;
+  } else {
+    if (category === "A") baseRate = 0;
+    else if (category === "B") baseRate = 850;
+    else if (category === "C") baseRate = 1250;
+    else if (category === "D") baseRate = 1800;
+  }
+
+  return baseRate * numberOfRooms * days;
 };

@@ -55,37 +55,59 @@ export const verifyOtp = async (req, res) => {
 };
 
 export const registerUser = async (req, res) => {
-  const user = req.body;
-  console.log(user);
-  const email = user?.email;
+  try {
+    const user = req.body;
+    console.log(user);
+    const email = user?.email;
+    const mobile = user?.mobile;
 
-  if (!email) return res.status(400).json({ error: "Email cannot be empty" });
-  const result = await User.findOne({ email: email });
+    // Validate email
+    if (!email) {
+      return res.status(400).json({ error: "Email cannot be empty" });
+    }
 
-  if (result) {
-    return res
-      .status(400)
-      .json({ success: false, message: "User already exists" });
+    // Validate mobile number
+    if (!mobile || !/^\d{10}$/.test(mobile)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Mobile number must be exactly 10 digits" 
+      });
+    }
+
+    // Check if user already exists
+    const result = await User.findOne({ email: email });
+    if (result) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "User already exists" 
+      });
+    }
+
+    const newUser = await User.create(user);
+    const refreshToken = jwt.sign({ email }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: "180d",
+    });
+    const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+      expiresIn: "5m",
+    });
+
+    console.log(newUser);
+    console.log("User saved");
+    
+    return res.status(200).json({
+      success: true,
+      accessToken,
+      user: newUser,
+      refreshToken,
+      message: "User added successfully",
+    });
+  } catch (err) {
+    console.log(err.message);
+    return res.status(400).json({ 
+      success: false, 
+      message: err.message 
+    });
   }
-
-  const newUser = await User.create(user);
-  const refreshToken = jwt.sign({ email }, process.env.REFRESH_TOKEN_SECRET, {
-    expiresIn: "180d",
-  });
-  const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
-    expiresIn: "5m",
-  });
-
-  console.log(newUser);
-
-  console.log("User saved");
-  return res.status(200).json({
-    success: true,
-    accessToken,
-    user: newUser,
-    refreshToken,
-    message: "User added successfully",
-  });
 };
 
 export const googleLoginUser = async (req, res) => {

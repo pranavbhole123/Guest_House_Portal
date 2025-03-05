@@ -1,5 +1,6 @@
 import express from "express";
 import { upload, checkFileSize } from "../middlewares/fileStore.js";
+import { checkAuth } from '../middlewares/tokens.js'
 
 import {
   createReservation,
@@ -27,6 +28,7 @@ import {
   checkoutToday,
   getDiningAmount,
   deleteReservations,
+  editReservation
 } from "../controllers/reservation.js";
 
 const Router = express.Router();
@@ -61,6 +63,14 @@ Router.put("/reject/:id", rejectReservation);
 Router.put("/hold/:id", holdReservation);
 Router.put("/payment/:id", updatePaymentStatus);
 Router.put("/:id", updateReservation);
+Router.put('/edit/:id', 
+  checkAuth,
+  checkFileSize,
+  upload.fields([
+    { name: "files", maxCount: 7 },
+  ]), 
+  editReservation
+);
 
 Router.post("/rooms", addRoom);
 Router.post("/:id", getDiningAmount);

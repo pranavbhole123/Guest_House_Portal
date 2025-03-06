@@ -25,18 +25,16 @@ const VisualizeData = () => {
 
   const handleVisualize = async () => {
     try {
-      // Build query parameters based on form inputs
+      // Build query parameters using JSON arrays for dynamic aggregation criteria
       const params = {};
       if (matchField && matchValue) {
-        params.matchField = matchField;
-        params.matchValue = matchValue;
+        params.matchCriteria = JSON.stringify([{ field: matchField, value: matchValue }]);
       }
       if (groupField) {
-        params.groupField = groupField;
+        params.groupFields = JSON.stringify([groupField]);
       }
       if (sortField) {
-        params.sortField = sortField;
-        params.sortOrder = sortOrder;
+        params.sortCriteria = JSON.stringify([{ field: sortField, order: sortOrder }]);
       }
 
       // Send GET request to your aggregated data endpoint

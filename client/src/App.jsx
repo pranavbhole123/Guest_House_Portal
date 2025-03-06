@@ -14,6 +14,7 @@ import RecordList from "./components/RecordList";
 import UserList from "./components/UserList";
 import RecordPage from "./pages/RecordPage";
 import AdminRecordList from "./components/AdminRecordList";
+import VisualizeData from "./components/VisualizeData";
 import Auth from "./utils/Auth";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
@@ -43,6 +44,7 @@ function App() {
               <Route path="" element={<AdminRecordList status="approved" />} />
               <Route path="pending-requests" element={<AdminRecordList />} />
               <Route path="reservation-form" element={<AdminReservationForm />} />
+              <Route path="process_data" element={<VisualizeData/>} />
 
 
               <Route path="users" element={<UserList />} />

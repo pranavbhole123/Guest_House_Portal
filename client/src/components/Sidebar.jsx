@@ -1,13 +1,10 @@
 import React, { useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import styles from "./Sidebar.module.css"; // Ensure CSS Module is correctly imported
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 
 const Sidebar = () => {
-  // Accept isOpen as prop
-
   const user = useSelector((state) => state.user);
   const [isOpen, setIsOpen] = useState(true);
 
@@ -23,6 +20,7 @@ const Sidebar = () => {
           "Users",
           "Rooms",
           "Reservation Form",
+          "Process Data",
         ]
       : user.role === "USER"
       ? [
@@ -38,14 +36,15 @@ const Sidebar = () => {
           "Checked Out",
           "Checkout today",
           "Payment Pending",
-        ] // other roles
+          "Process Data",
+        ]
       : ["Approved Requests", "Pending Requests", "Rejected Requests"];
 
   return (
     <div className="flex flex-col lg:absolute lg:z-100 h-full text-black">
       <div
         className={
-          "absolute top-28 lg:top-[-38px] text-white left-4 z-20 text-xl flex gap-2 items-baseline" +
+          "absolute top-28 lg:top-[-38px] text-white left-4 z-20 text-xl flex gap-2 items-baseline " +
           styles.menuIcon
         }
       >
@@ -56,7 +55,7 @@ const Sidebar = () => {
           ☰
         </div>
       </div>
-      <hr></hr>
+      <hr />
       <div
         className={`text-white ${styles.sidebar} ${
           !isOpen ? styles.closed : ""
@@ -69,19 +68,25 @@ const Sidebar = () => {
         <ul
           className={
             styles["sidebar-menu"] +
-            `${isOpen ? "" : styles["sidebar-menu-closed"]}`
+            (isOpen ? "" : styles["sidebar-menu-closed"])
           }
         >
-          {content.map((item, index) => (
-            <Link
-              className=""
-              key={"sidebar-" + index}
-              to={index === 0 ? "" : `${item.toLowerCase().replace(" ", "-")}`}
-            >
-              <li className={" " + styles["menu-item"]}>{item}</li>
-              <hr></hr>
-            </Link>
-          ))}
+          {content.map((item, index) => {
+            // Check if the current item is "Process Data" and assign the correct route
+            const route =
+              item === "Process Data"
+                ? "process_data"
+                : index === 0
+                ? ""
+                : item.toLowerCase().replace(" ", "-");
+
+            return (
+              <Link className="" key={"sidebar-" + index} to={route}>
+                <li className={styles["menu-item"]}>{item}</li>
+                <hr />
+              </Link>
+            );
+          })}
         </ul>
       </div>
     </div>

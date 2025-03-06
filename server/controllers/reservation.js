@@ -1066,20 +1066,22 @@ export const editReservation = async (req, res) => {
     );
     const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
     let room_cost = 0;
+    console.log(days)
 
-    if (req.body.roomType === "Single Occupancy") {
+    if (existingReservation.roomType === "Single Occupancy") {
       if (req.body.category === "A") room_cost = 0;
-      else if (req.body.category === "B") room_cost = 600 * req.body.numberOfRooms * days;
-      else if (req.body.category === "C") room_cost = 900 * req.body.numberOfRooms * days;
-      else if (req.body.category === "D") room_cost = 1300 * req.body.numberOfRooms * days;
+      else if (req.body.category === "B") room_cost = 600 * existingReservation.numberOfRooms * days;
+      else if (req.body.category === "C") room_cost = 900 * existingReservation.numberOfRooms * days;
+      else if (req.body.category === "D") room_cost = 1300 * existingReservation.numberOfRooms * days;
     } else {
       if (req.body.category === "A") room_cost = 0;
-      else if (req.body.category === "B") room_cost = 850 * req.body.numberOfRooms * days;
-      else if (req.body.category === "C") room_cost = 1250 * req.body.numberOfRooms * days;
-      else if (req.body.category === "D") room_cost = 1800 * req.body.numberOfRooms * days;
+      else if (req.body.category === "B") room_cost = 850 * existingReservation.numberOfRooms * days;
+      else if (req.body.category === "C") room_cost = 1250 * existingReservation.numberOfRooms * days;
+      else if (req.body.category === "D") room_cost = 1800 * existingReservation.numberOfRooms * days;
     }
 
-    console.log('Calculated room cost:', room_cost);
+    
+
     console.log('Days:', days);
     console.log('Room type:', req.body.roomType);
     console.log('Category:', req.body.category);

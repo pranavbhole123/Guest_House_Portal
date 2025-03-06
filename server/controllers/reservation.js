@@ -43,6 +43,10 @@ async function sendVerificationEmail(to, subject, body) {
 export async function createReservation(req, res) {
   try {
     //user details are contained in req.user
+    //console.dir(req, { depth: null, colors: true });
+    console.log("--------------------------------------------")
+    console.log(req)
+    console.log("--------------------------------------------")
 
     const {
       numberOfGuests,
@@ -61,6 +65,8 @@ export async function createReservation(req, res) {
       applicant,
       source,
     } = req.body;
+   // req.body.applicant=JSON.parse(req.body.applicant)
+    
     var room_cost;
     const ms = Number(
       new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
@@ -81,8 +87,7 @@ export async function createReservation(req, res) {
       else if (category == "D") room_cost = 1800 * numberOfRooms * days;
     }
     //single rooms cost
-    console.log(source);
-    console.log(applicant[0]);
+    
     let applicantData;
     if (applicant[0]) applicantData = JSON.parse(applicant[0]);
     console.log(applicantData);

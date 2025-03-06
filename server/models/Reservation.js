@@ -213,6 +213,65 @@ reservationSchema.pre("save", async function (next) {
 //   startAt: 1,
 //   incrementBy: 1,
 // });
+
+reservationSchema.statics.aggregateReservations = async function (
+  matchCriteria,
+  groupFields,
+  sortCriteria
+) {
+  try {
+    // Build the $match stage from the matchCriteria array.
+    let matchStage = {};
+    if (Array.isArray(matchCriteria) && matchCriteria.length > 0) {
+      matchCriteria.forEach(condition => {
+        // Example: { field: "status", value: "REJECTED" }
+        matchStage[condition.field] = condition.value;
+      });
+    }
+
+    // Build the $group stage.
+    // Create a composite _id using the groupFields array.
+    let groupId = {};
+    if (Array.isArray(groupFields) && groupFields.length > 0) {
+      groupFields.forEach(field => {
+        groupId[field] = `$${field}`;
+      });
+    } else {
+      // Group all documents together if no group fields are provided.
+      groupId = null;
+    }
+    const groupStage = {
+      _id: groupId,
+      count: { $sum: 1 },
+    };
+
+    // Build the $sort stage.
+    let sortStage = {};
+    if (Array.isArray(sortCriteria) && sortCriteria.length > 0) {
+      sortCriteria.forEach(sortCondition => {
+        // Example: { field: "count", order: "asc" }
+        const order = sortCondition.order.toLowerCase() === "asc" ? 1 : -1;
+        sortStage[sortCondition.field] = order;
+      });
+    }
+
+    // Assemble the aggregation pipeline.
+    const pipeline = [];
+    if (Object.keys(matchStage).length > 0) {
+      pipeline.push({ $match: matchStage });
+    }
+    pipeline.push({ $group: groupStage });
+    if (Object.keys(sortStage).length > 0) {
+      pipeline.push({ $sort: sortStage });
+    }
+
+    // Execute the aggregation pipeline using Mongoose's built-in aggregate method.
+    return await this.aggregate(pipeline);
+  } catch (error) {
+    console.error("Aggregation error:", error);
+    throw error;
+  }
+};
 const Reservation = mongoose.model("Reservation", reservationSchema);
 
 export default Reservation;

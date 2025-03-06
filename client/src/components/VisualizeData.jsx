@@ -15,26 +15,74 @@ import "./VisualizeData.css";
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const VisualizeData = () => {
-  const [matchField, setMatchField] = useState("");
-  const [matchValue, setMatchValue] = useState("");
-  const [groupField, setGroupField] = useState("");
-  const [sortField, setSortField] = useState("");
-  const [sortOrder, setSortOrder] = useState("asc");
+  // Use comma separated inputs for multiple criteria
+  const [matchFields, setMatchFields] = useState("");
+  const [matchValues, setMatchValues] = useState("");
+  const [groupFields, setGroupFields] = useState("");
+  const [sortFields, setSortFields] = useState("");
+  const [sortOrders, setSortOrders] = useState("");
   const [chartData, setChartData] = useState(null);
   const [error, setError] = useState(null);
 
   const handleVisualize = async () => {
     try {
-      // Build query parameters using JSON arrays for dynamic aggregation criteria
       const params = {};
-      if (matchField && matchValue) {
-        params.matchCriteria = JSON.stringify([{ field: matchField, value: matchValue }]);
+
+      // Build matchCriteria array from comma separated inputs
+      if (matchFields && matchValues) {
+        const fieldsArray = matchFields
+          .split(",")
+          .map((f) => f.trim())
+          .filter((f) => f);
+        const valuesArray = matchValues
+          .split(",")
+          .map((v) => v.trim())
+          .filter((v) => v);
+
+        if (fieldsArray.length !== valuesArray.length) {
+          setError("Number of match fields and match values must be equal");
+          setChartData(null);
+          return;
+        }
+
+        const matchCriteria = fieldsArray.map((field, index) => ({
+          field,
+          value: valuesArray[index],
+        }));
+        params.matchCriteria = JSON.stringify(matchCriteria);
       }
-      if (groupField) {
-        params.groupFields = JSON.stringify([groupField]);
+
+      // Build groupFields array from comma separated input
+      if (groupFields) {
+        const groupFieldsArray = groupFields
+          .split(",")
+          .map((f) => f.trim())
+          .filter((f) => f);
+        params.groupFields = JSON.stringify(groupFieldsArray);
       }
-      if (sortField) {
-        params.sortCriteria = JSON.stringify([{ field: sortField, order: sortOrder }]);
+
+      // Build sortCriteria array from comma separated inputs
+      if (sortFields && sortOrders) {
+        const sortFieldsArray = sortFields
+          .split(",")
+          .map((f) => f.trim())
+          .filter((f) => f);
+        const sortOrdersArray = sortOrders
+          .split(",")
+          .map((o) => o.trim())
+          .filter((o) => o);
+
+        if (sortFieldsArray.length !== sortOrdersArray.length) {
+          setError("Number of sort fields and sort orders must be equal");
+          setChartData(null);
+          return;
+        }
+
+        const sortCriteria = sortFieldsArray.map((field, index) => ({
+          field,
+          order: sortOrdersArray[index],
+        }));
+        params.sortCriteria = JSON.stringify(sortCriteria);
       }
 
       // Send GET request to your aggregated data endpoint
@@ -74,55 +122,56 @@ const VisualizeData = () => {
       <h2 className="visualize-header">Visualize Reservation Data</h2>
       <div className="visualize-form">
         <div className="form-group">
-          <label htmlFor="matchField">Match Field:</label>
+          <label htmlFor="matchFields">Match Fields (comma separated):</label>
           <input
             type="text"
-            id="matchField"
-            value={matchField}
-            onChange={(e) => setMatchField(e.target.value)}
-            placeholder="e.g., status"
+            id="matchFields"
+            value={matchFields}
+            onChange={(e) => setMatchFields(e.target.value)}
+            placeholder="e.g., status, type"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="matchValue">Match Value:</label>
+          <label htmlFor="matchValues">Match Values (comma separated):</label>
           <input
             type="text"
-            id="matchValue"
-            value={matchValue}
-            onChange={(e) => setMatchValue(e.target.value)}
-            placeholder="e.g., REJECTED"
+            id="matchValues"
+            value={matchValues}
+            onChange={(e) => setMatchValues(e.target.value)}
+            placeholder="e.g., REJECTED, APPROVED"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="groupField">Group Field:</label>
+          <label htmlFor="groupFields">Group Fields (comma separated):</label>
           <input
             type="text"
-            id="groupField"
-            value={groupField}
-            onChange={(e) => setGroupField(e.target.value)}
-            placeholder="e.g., category"
+            id="groupFields"
+            value={groupFields}
+            onChange={(e) => setGroupFields(e.target.value)}
+            placeholder="e.g., category, subCategory"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="sortField">Sort Field:</label>
+          <label htmlFor="sortFields">Sort Fields (comma separated):</label>
           <input
             type="text"
-            id="sortField"
-            value={sortField}
-            onChange={(e) => setSortField(e.target.value)}
-            placeholder="e.g., count"
+            id="sortFields"
+            value={sortFields}
+            onChange={(e) => setSortFields(e.target.value)}
+            placeholder="e.g., count, date"
           />
         </div>
         <div className="form-group">
-          <label htmlFor="sortOrder">Sort Order:</label>
-          <select
-            id="sortOrder"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
+          <label htmlFor="sortOrders">
+            Sort Orders (comma separated, e.g., asc, desc):
+          </label>
+          <input
+            type="text"
+            id="sortOrders"
+            value={sortOrders}
+            onChange={(e) => setSortOrders(e.target.value)}
+            placeholder="e.g., asc, desc"
+          />
         </div>
         <button className="visualize-btn" onClick={handleVisualize}>
           Visualize Data

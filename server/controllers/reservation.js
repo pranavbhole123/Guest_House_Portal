@@ -44,9 +44,7 @@ export async function createReservation(req, res) {
   try {
     //user details are contained in req.user
     //console.dir(req, { depth: null, colors: true });
-    console.log("--------------------------------------------")
-    console.log(req)
-    console.log("--------------------------------------------")
+  
 
     const {
       numberOfGuests,
@@ -65,15 +63,15 @@ export async function createReservation(req, res) {
       applicant,
       source,
     } = req.body;
-   // req.body.applicant=JSON.parse(req.body.applicant)
-    
+
+  
     var room_cost;
     const ms = Number(
       new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
     );
-    console.log(ms);
+    //console.log(ms);
     const days = Number(ms / (1000 * 60 * 60 * 24));
-    console.log(days);
+    //console.log(days);
 
     if (roomType == "Single Occupancy") {
       if (category == "A") room_cost = 0;
@@ -89,8 +87,8 @@ export async function createReservation(req, res) {
     //single rooms cost
     
     let applicantData;
-    if (applicant[0]) applicantData = JSON.parse(applicant[0]);
-    console.log(applicantData);
+    if (applicant[0]) applicantData = applicant[0];
+    console.log(typeof(applicantData));
 
     const email = req.user.email;
     const receiptid = req.files["receipt"][0].id;

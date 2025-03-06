@@ -408,8 +408,9 @@ function ReservationForm() {
     try {
       const formDataToSend = new FormData();
       Object.entries(formData).forEach(([fieldName, fieldValue]) => {
-        if (fieldName === "applicant"){
-        formDataToSend.append(fieldName, JSON.stringify(fieldValue));} 
+        
+
+        
         formDataToSend.append(fieldName, fieldValue);
       });
       for (const file of files) {

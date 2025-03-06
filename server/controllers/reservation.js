@@ -317,7 +317,18 @@ export async function approveReservation(req, res) {
         .status(403)
         .json({ message: "You are not authorized to perform this action" });
     }
+    
     let found = false;
+    let wasRejectedByChairman = false;
+    
+    // Check if this is a chairman reverting a rejection
+    if (req.user.role === "CHAIRMAN") {
+      const chairmanReviewer = reservation.reviewers.find(r => r.role === "CHAIRMAN");
+      if (chairmanReviewer && chairmanReviewer.status === "REJECTED") {
+        wasRejectedByChairman = true;
+      }
+    }
+    
     reservation.reviewers = reservation.reviewers.map((reviewer) => {
       if (reviewer.role === req.user.role) {
         found = true;
@@ -334,6 +345,26 @@ export async function approveReservation(req, res) {
         comments: req.body.comments || "",
       });
     }
+    
+    // If chairman is reverting a rejection, we need to make sure admin sees this
+    if (wasRejectedByChairman && req.user.role === "CHAIRMAN") {
+      // Find if admin is already a reviewer
+      const adminReviewer = reservation.reviewers.find(r => r.role === "ADMIN");
+      
+      if (adminReviewer) {
+        // Reset admin status to PENDING so they can review again
+        adminReviewer.status = "PENDING";
+        adminReviewer.comments = "Reverted by Chairman, needs review again: " + (req.body.comments || "");
+      } else {
+        // Add admin as a pending reviewer if not already there
+        reservation.reviewers.push({
+          role: "ADMIN",
+          status: "PENDING",
+          comments: "Added by Chairman after reverting rejection: " + (req.body.comments || ""),
+        });
+      }
+    }
+    
     let initStatus = reservation.status;
     reservation = await updateReservationStatus(reservation);
     console.log(reservation);
@@ -490,6 +521,7 @@ export const getPendingReservations = async (req, res) => {
       });
       return res.status(200).json(reservations);
     } else if (req.user.role !== "ADMIN") {
+      // For Chairman or other roles, don't show forms where any reviewer has rejected
       const reservations = await Reservation.find({
         reviewers: {
           $elemMatch: {
@@ -497,12 +529,26 @@ export const getPendingReservations = async (req, res) => {
             status: "PENDING",
           },
         },
+        // Don't show forms where any reviewer has rejected it
+        "reviewers.status": { $nin: ["REJECTED"] }
       }).sort({
         createdAt: -1,
       });
       res.status(200).json(reservations);
     } else {
-      const reservations = await Reservation.find({ status: "PENDING" }).sort({
+      // For ADMIN, don't show forms that have been rejected by Chairman
+      const reservations = await Reservation.find({ 
+        status: "PENDING",
+        // Don't show forms where chairman has rejected
+        reviewers: {
+          $not: {
+            $elemMatch: {
+              role: "CHAIRMAN",
+              status: "REJECTED"
+            }
+          }
+        }
+      }).sort({
         createdAt: -1,
       });
       res.status(200).json(reservations);
@@ -552,6 +598,7 @@ export const getRejectedReservations = async (req, res) => {
   console.log("Getting rejected reservations...");
   try {
     if (req.user.role === "USER") {
+      // For users, show all rejected reservations
       const reservations = await Reservation.find({
         guestEmail: req.user.email,
         status: "REJECTED",
@@ -560,13 +607,47 @@ export const getRejectedReservations = async (req, res) => {
       });
       return res.status(200).json(reservations);
     } else if (req.user.role === "ADMIN") {
+      // For admin, show reservations that are rejected (either by admin or by other reviewers)
       const reservations = await Reservation.find({
         status: "REJECTED",
       }).sort({
         createdAt: -1,
       });
       res.status(200).json(reservations);
+    } else if (req.user.role === "CHAIRMAN") {
+      // For chairman, show reservations where either:
+      // 1. The chairman personally rejected it (so they can revert/accept again)
+      // 2. The reservation's overall status is REJECTED but not rejected by admin
+      const reservations = await Reservation.find({
+        $or: [
+          // Chairman personally rejected it
+          {
+            reviewers: {
+              $elemMatch: {
+                role: "CHAIRMAN",
+                status: "REJECTED",
+              },
+            },
+          },
+          // Overall status is REJECTED but not rejected by admin
+          {
+            status: "REJECTED",
+            reviewers: {
+              $not: {
+                $elemMatch: {
+                  role: "ADMIN",
+                  status: "REJECTED",
+                },
+              },
+            },
+          },
+        ],
+      }).sort({
+        createdAt: -1,
+      });
+      res.status(200).json(reservations);
     } else {
+      // For other roles, show reservations they personally rejected
       const reservations = await Reservation.find({
         reviewers: {
           $elemMatch: {
@@ -1080,8 +1161,6 @@ export const editReservation = async (req, res) => {
       else if (req.body.category === "D") room_cost = 1800 * existingReservation.numberOfRooms * days;
     }
 
-    
-
     console.log('Days:', days);
     console.log('Room type:', req.body.roomType);
     console.log('Category:', req.body.category);
@@ -1096,13 +1175,33 @@ export const editReservation = async (req, res) => {
       });
     }
 
+    // Determine reviewers based on category
+    let reviewersArray = [];
+    
+    // Ensure both admin and chairman are added as reviewers when form is edited
+    reviewersArray.push({ role: "ADMIN", comments: "Form edited by user", status: "PENDING" });
+    
+    // For category C and D, always add chairman
+    if (req.body.category === 'C' || req.body.category === 'D') {
+      reviewersArray.push({ role: "CHAIRMAN", comments: "Form edited by user", status: "PENDING" });
+    } else {
+      // For categories A and B, check if chairman was previously a reviewer
+      const wasChairmanReviewer = existingReservation.reviewers.some(
+        reviewer => reviewer.role === "CHAIRMAN" || reviewer.role.startsWith("CHAIRMAN ")
+      );
+      
+      if (wasChairmanReviewer) {
+        reviewersArray.push({ role: "CHAIRMAN", comments: "Form edited by user", status: "PENDING" });
+      }
+    }
+
     // Prepare update data
     const updateData = {
       ...req.body,
       applicant: applicantData,
       status: "PENDING",
       stepsCompleted: 1,
-      reviewers: [],
+      reviewers: reviewersArray,
       files: [...(existingReservation.files || []), ...newFiles],
       payment: {
         ...existingReservation.payment,

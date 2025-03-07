@@ -59,7 +59,7 @@ export const registerUser = async (req, res) => {
     const user = req.body;
     console.log(user);
     const email = user?.email;
-    const mobile = user?.mobile;
+    const mobile = user?.contact;
 
     // Validate email
     if (!email) {

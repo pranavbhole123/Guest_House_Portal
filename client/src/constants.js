@@ -2,4 +2,4 @@
 // export const BASE_URL = "http://localhost:4751";
 
 // Use environment variable in production or fallback to localhost for development
-export const BASE_URL =  "https://guesthouseportal-production.up.railway.app/";
+export const BASE_URL =  "https://guesthouseportal-production.up.railway.app";

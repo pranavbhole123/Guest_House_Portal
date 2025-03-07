@@ -12,7 +12,7 @@ import utilsRoute from "./routes/utilsRoute.js";
 import multer from "multer";
 import { GridFsStorage } from "multer-gridfs-storage";
 
-const port = process.env.PORT || 4751;
+const port =  4751;
 dotenv.config();
 const app = express();
 
@@ -27,7 +27,7 @@ const connection = mongoose
     console.log("Connected to database");
     // storage= new GridFsStorage({db:mongoose.connection.db})
     // upload=multer({storage});)
-    app.listen(port, () => {
+    app.listen(port, "0.0.0.0",() => {
       console.log(`Server is runnning at port ${port}`);
     });
   })

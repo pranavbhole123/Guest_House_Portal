@@ -79,9 +79,11 @@ const Login = ({ isRegister }) => {
     try {
       setIsDisabled(true);
 
-      await axios.post(BASE_URL + "/auth/otp", {
-        email: credentials.email,
-      });
+      await axios.post(
+        BASE_URL + "/auth/otp",
+        { email: credentials.email },
+        { timeout: 8000 } // timeout after 5000ms
+      );
       toast.update(toast_id, {
         render: "OTP sent successfully",
         type: "success",

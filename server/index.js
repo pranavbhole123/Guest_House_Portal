@@ -1,7 +1,12 @@
+import dotenv from "dotenv"; 
+dotenv.config(); // Load environment variables before anything else
+
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
+import multer from "multer";
+import { GridFsStorage } from "multer-gridfs-storage";
+
 import authRoute from "./routes/authRoute.js";
 import userRoute from "./routes/userRoute.js";
 import { checkAuth } from "./middlewares/tokens.js";
@@ -9,56 +14,62 @@ import reservationRoute from "./routes/reservationRoute.js";
 import diningRoute from "./routes/diningRoute.js";
 import utilsRoute from "./routes/utilsRoute.js";
 
-import multer from "multer";
-import { GridFsStorage } from "multer-gridfs-storage";
-
-const port =  4751;
-dotenv.config();
 const app = express();
+const port =  4751;
 
+// Ensure logs are visible in production mode
 if (process.env.NODE_ENV === "production") {
-  console.log = () => {};
+  console.log("Running in production mode");
 }
 
-// var storage,upload;
-const connection = mongoose
-  .connect(process.env.MONGO_URL)
-  .then(() => {
-    console.log("Connected to database");
-    // storage= new GridFsStorage({db:mongoose.connection.db})
-    // upload=multer({storage});)
-    app.listen(port, "0.0.0.0",() => {
-      console.log(`Server is runnning at port ${port}`);
+// Connect to MongoDB first
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
-  })
-  .catch((err) => console.log(err));
+    console.log("Connected to database");
 
-await connection;
-// var upload
-const storage = new GridFsStorage({ url: process.env.MONGO_URL });
-storage.on("connection", () => {});
-const upload = multer({ storage });
+    // Initialize GridFsStorage after database connection
+    const storage = new GridFsStorage({ url: process.env.MONGO_URL });
+    storage.on("connection", () => {
+      console.log("GridFsStorage is ready");
+    });
+    const upload = multer({ storage });
 
+    // Start server only after DB connection
+    app.listen(port,"0.0.0.0",() => {
+      console.log(`Server is running at port ${port}`);
+    });
+
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    process.exit(1); // Exit process if DB connection fails
+  }
+};
+
+// Start Database Connection
+connectDB();
+
+// Middleware
 app.use(cors());
-app.use(express.json()); //for parsing application/json
-// app.use(upload.array('files',10));
+app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
+// Routes
 app.get("/", (req, res) => {
-  console.log(req.files);
-  res.json({
-    message: "A simple API",
-  });
+  res.json({ message: "Guest House Portal API is running" });
 });
 
-//app.use(expressjwt({ secret: process.env.ACCESS_TOKEN_SECRET, algorithms: ['HS256'] }).unless({ path: ["/auth/login", "/auth/register"] }));
 app.use("/auth", authRoute);
 app.use("/user", checkAuth, userRoute);
 app.use("/dining", checkAuth, diningRoute);
 app.use("/reservation", checkAuth, reservationRoute);
 app.use("/utils", utilsRoute);
+
 app.get("/protected", checkAuth, (req, res) => {
-  console.log("Protected route Getting executed!!!");
+  console.log("Protected route accessed");
   res.json({
     message: "Protected route",
     user: req.body.user,

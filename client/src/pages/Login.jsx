@@ -79,9 +79,10 @@ const Login = ({ isRegister }) => {
     try {
       setIsDisabled(true);
 
-      await axios.post(BASE_URL + "/auth/otp", {
+      const response = await axios.post(BASE_URL + "/auth/otp", {
         email: credentials.email,
       });
+      
       toast.update(toast_id, {
         render: "OTP sent successfully",
         type: "success",
@@ -90,8 +91,17 @@ const Login = ({ isRegister }) => {
       });
 
       setIsDisabled(false);
+      return true;
     } catch (error) {
       setIsDisabled(false);
+      console.error("OTP error:", error);
+      
+      // More detailed error logging
+      if (error.response) {
+        console.error("Response data:", error.response.data);
+        console.error("Response status:", error.response.status);
+      }
+      
       if (error.response?.data?.message) {
         toast.update(toast_id, {
           render: error.response.data.message,
@@ -99,14 +109,22 @@ const Login = ({ isRegister }) => {
           isLoading: false,
           autoClose: 2000,
         });
+      } else if (error.response?.data?.error) {
+        toast.update(toast_id, {
+          render: error.response.data.error,
+          type: "error",
+          isLoading: false,
+          autoClose: 2000,
+        });
       } else {
         toast.update(toast_id, {
-          render: "Something went wrong!",
+          render: "Error sending OTP. Please try again later.",
           type: "error",
           isLoading: false,
           autoClose: 2000,
         });
       }
+      return false;
     }
   };
 
@@ -123,27 +141,16 @@ const Login = ({ isRegister }) => {
     if (!showOtp) {
       try {
         setIsDisabled(true);
-
-        const res = await toast.promise(
-          axios.post(BASE_URL + "/auth/otp", {
-            email: credentials.email,
-          }),
-          {
-            pending: "Sending OTP",
-            success: "OTP sent successfully",
-            error: {
-              render({ data }) {
-                console.log(data);
-                // return data.response.data.error;
-              },
-            },
-          }
-        );
-        setShowOtp(true);
+        
+        const success = await sendOtp();
+        if (success) {
+          setShowOtp(true);
+          setSeconds(OTP_RESEND_TIME);
+        }
+        
         setIsDisabled(false);
-
-        setSeconds(OTP_RESEND_TIME);
       } catch (error) {
+        console.error("Submit error:", error);
         setIsDisabled(false);
       }
     } else {

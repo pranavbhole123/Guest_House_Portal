@@ -12,6 +12,11 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 
 
 const style = {
@@ -34,6 +39,8 @@ export default function AddRoom() {
 	const [hoverOverRoom, setHoverOverRoom] = useState([]);
 	const [open, setOpen] = useState(false);
 	const [roomNumber, setRoomNumber] = useState("");
+	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [roomToDelete, setRoomToDelete] = useState(null);
 
 	const user = useSelector((state) => state.user);
 	const http = privateRequest(user.accessToken, user.refreshToken);
@@ -112,31 +119,40 @@ export default function AddRoom() {
 		}
 	};
 
-	const deleteRoom = async (room) => {
+	const handleDeleteRoom = (room) => {
+		if (room.bookings.length > 0) {
+			toast.error("This room is occupied. Please deallocate the room first.");
+			return;
+		}
+		setRoomToDelete(room);
+		setConfirmOpen(true);
+	};
+
+	const confirmDeleteRoom = async () => {
+		if (!roomToDelete) return;
 		try {
 			const response = await http.delete("/reservation/rooms", {
-				data: { roomId: room._id }
+				data: { roomId: roomToDelete._id }
 			});
 
 			const newRoom = response.data.room;
 
-			// Update the rooms state to include the new room
-			const updateRooms = rooms.map((room) => {
-				if (room !== newRoom) return room;
-			})
+			const updateRooms = rooms.filter((room) => room._id !== newRoom._id);
 
 			setRooms(updateRooms);
 
-			toast.success(response.data.message);
-			window.location.reload();
+			toast.success("Room deleted successfully");
 		} catch (error) {
 			if (error.response?.data?.message) {
 				toast.error(error.response.data.message);
 			} else {
 				toast.error("Failed to delete room");
 			}
+		} finally {
+			setConfirmOpen(false);
+			setRoomToDelete(null);
 		}
-	}
+	};
 
 	const handleOpen = () => setOpen(true);
 	const handleClose = () => setOpen(false);
@@ -192,7 +208,7 @@ export default function AddRoom() {
 							>
 								<IconButton
 									aria-label="delete room"
-									onClick={() => deleteRoom(room)}
+									onClick={() => handleDeleteRoom(room)}
 								>
 									<DeleteIcon />
 								</IconButton>
@@ -238,6 +254,25 @@ export default function AddRoom() {
 					</div>
 				</Box>
 			</Modal>
+			<Dialog
+				open={confirmOpen}
+				onClose={() => setConfirmOpen(false)}
+			>
+				<DialogTitle>{"Confirm Deletion"}</DialogTitle>
+				<DialogContent>
+					<DialogContentText>
+						Are you sure you want to delete this room?
+					</DialogContentText>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setConfirmOpen(false)} color="primary">
+						Cancel
+					</Button>
+					<Button onClick={confirmDeleteRoom} color="primary" autoFocus>
+						Delete
+					</Button>
+				</DialogActions>
+			</Dialog>
 		</div>
 	);
 }

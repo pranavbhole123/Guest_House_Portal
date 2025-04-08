@@ -111,11 +111,6 @@ export default function RecordPage() {
           </div>
           <hr />
           <div className="flex justify-between px-32">
-            <p className="p-1 text-xl font-semibold">Applicant name:</p>
-            <p className="p-1 text-lg">{userRecord.applicant ? userRecord.applicant.name : 'N/A'}</p>
-          </div>
-          <hr />
-          <div className="flex justify-between px-32">
             <p className="p-0 text-xl font-semibold">Address:</p>
             <p className="p-0 text-lg">{userRecord.address}</p>
           </div>

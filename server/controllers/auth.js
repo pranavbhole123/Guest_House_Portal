@@ -20,13 +20,23 @@ export const sendOtp = async (req, res) => {
     await OTP.deleteMany({ email: req.body.email });
 
     const otpBody = await OTP.create({ email: req.body.email, otp });
+    
+    // Even if the email fails to send (which we now handle gracefully in the OTP model),
+    // we still return success because the OTP was created in the database
     res.status(200).json({
       message: "OTP sent successfully",
     });
     console.log(otpBody);
   } catch (err) {
-    console.log(err.message);
-    res.status(400).json({ error: err.message });
+    console.log("Error in sendOtp controller:", err.message);
+    // Log more detailed error information
+    if (err.code) console.log("Error code:", err.code);
+    if (err.stack) console.log("Error stack:", err.stack);
+    
+    res.status(400).json({ 
+      error: "Error creating OTP", 
+      message: err.message 
+    });
   }
 };
 

@@ -8,6 +8,7 @@ import { checkAuth } from "./middlewares/tokens.js";
 import reservationRoute from "./routes/reservationRoute.js";
 import diningRoute from "./routes/diningRoute.js";
 import utilsRoute from "./routes/utilsRoute.js";
+import exportRoute from "./routes/exportRoute.js";
 
 import multer from "multer";
 import { GridFsStorage } from "multer-gridfs-storage";
@@ -57,6 +58,9 @@ app.use("/user", checkAuth, userRoute);
 app.use("/dining", checkAuth, diningRoute);
 app.use("/reservation", checkAuth, reservationRoute);
 app.use("/utils", utilsRoute);
+
+// Export routes
+app.use("/api/export", checkAuth, exportRoute);
 app.get("/protected", checkAuth, (req, res) => {
   console.log("Protected route Getting executed!!!");
   res.json({

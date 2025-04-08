@@ -19,10 +19,25 @@ axios.interceptors.request.use((config) => {
 
 axios.interceptors.response.use(
   (res) => {
-    if (!res.data?.hideMessage && res.data?.message) toast.success(res.data.message);
+    // Check for the suppress-global-notification header
+    const suppressNotifications = res.config.headers && res.config.headers['x-suppress-global-notification'] === 'true';
+    
+    // Only show success messages if not suppressed and the data has a message
+    if (!suppressNotifications && !res.data?.hideMessage && res.data?.message) {
+      toast.success(res.data.message);
+    }
     return res;
   },
   (error) => {
+    // Check if there was a header to suppress notifications in the original request
+    const suppressNotifications = error.config?.headers && error.config.headers['x-suppress-global-notification'] === 'true';
+    
+    if (suppressNotifications) {
+      // If notifications are suppressed, just log the error and reject the promise
+      console.log('Error suppressed from global notifications:', error);
+      return Promise.reject(error);
+    }
+    
     const expectedError =
       error.response &&
       error.response.status >= 400 &&

@@ -28,6 +28,11 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Typography from '@mui/material/Typography';
 import JSZip from 'jszip';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import { styled } from '@mui/material/styles';
 
 export default function AdminRecordList({ status = "pending" }) {
   const [checked, setChecked] = useState([]);
@@ -48,14 +53,16 @@ export default function AdminRecordList({ status = "pending" }) {
   const [loadingZip, setLoadingZip] = useState(false);
   const [selectedZipContent, setSelectedZipContent] = useState(null);
   const [selectedContentData, setSelectedContentData] = useState(null);
+  const [selectedRejectReason, setSelectedRejectReason] = useState("0");
+  const [showCustomReasonField, setShowCustomReasonField] = useState(false);
 
   const user = useSelector((state) => state.user);
   const isAdminOrChairman = user.role === "ADMIN" || user.role === "CHAIRMAN";
 
   const filterMap = {
     "Guest Name": "guestName",
-    "Number of Rooms": "numberOfRooms",
-    "Number of Guests": "numberOfGuests",
+    "#Rooms": "numberOfRooms",
+    "#Guests": "numberOfGuests",
     Category: "category",
     "Arrival Date": "arrivalDate",
     "Departure Date": "departureDate",
@@ -152,8 +159,8 @@ export default function AdminRecordList({ status = "pending" }) {
 
   const options = [
     "Guest Name",
-    "Number of Rooms",
-    "Number of Guests",
+    "#Rooms",
+    "#Guests",
     "Category",
     "Arrival Date",
     "Departure Date",
@@ -173,11 +180,11 @@ export default function AdminRecordList({ status = "pending" }) {
       console.log(sortType);
       const tempRecords = [...newRecords];
       if (sortToggle) {
-        if (sortType === "No. of Guests") {
+        if (sortType === "#Guests") {
           tempRecords.sort((a, b) => {
             return a.numberOfGuests - b.numberOfGuests;
           });
-        } else if (sortType === "No. of Rooms") {
+        } else if (sortType === "#Rooms") {
           tempRecords.sort((a, b) => {
             return a.numberOfRooms - b.numberOfRooms;
           });
@@ -200,11 +207,11 @@ export default function AdminRecordList({ status = "pending" }) {
           });
         }
       } else {
-        if (sortType === "No. of Guests") {
+        if (sortType === "#Guests") {
           tempRecords.sort((a, b) => {
             return b.numberOfGuests - a.numberOfGuests;
           });
-        } else if (sortType === "No. of Rooms") {
+        } else if (sortType === "#Rooms") {
           tempRecords.sort((a, b) => {
             return b.numberOfRooms - a.numberOfRooms;
           });
@@ -232,14 +239,59 @@ export default function AdminRecordList({ status = "pending" }) {
     handleSort();
   }, [sortToggle, sortType]);
 
+  const rejectionReasons = [
+    { id: "0", reason: "Select a Reason" },
+    { id: "1", reason: "Room is not available" },
+    { id: "2", reason: "Document uploaded is blurred, please re-upload" },
+    { id: "3", reason: "Document uploaded does not match the provided category" },
+    { id: "4", reason: "Requested dates are not available" },
+    { id: "5", reason: "Incomplete information provided" },
+    { id: "6", reason: "Booking policy violation" },
+    { id: "7", reason: "Duplicate booking request" },
+    { id: "8", reason: "Other" }
+  ];
+
+  const StyledSelect = styled(Select)(({ theme }) => ({
+    width: '100%',
+    marginBottom: theme.spacing(2),
+    '& .MuiOutlinedInput-input': {
+      padding: '12px 14px',
+    },
+  }));
+
   const handleRejectClick = (recordId) => {
     setSelectedRecordId(recordId);
+    setRejectReason("");
+    setSelectedRejectReason("0");
+    setShowCustomReasonField(false);
     setOpenRejectDialog(true);
   };
 
+  const handleReasonChange = (event) => {
+    const value = event.target.value;
+    setSelectedRejectReason(value);
+    
+    if (value === "8") { 
+      setShowCustomReasonField(true);
+      setRejectReason("");
+    } else if (value !== "0") {
+      const selectedReason = rejectionReasons.find(item => item.id === value);
+      setRejectReason(selectedReason.reason);
+      setShowCustomReasonField(false);
+    } else {
+      setRejectReason("");
+      setShowCustomReasonField(false);
+    }
+  };
+
   const handleRejectConfirm = async () => {
-    if (!rejectReason.trim()) {
-      toast.error("Please provide a reason for rejection");
+    if (selectedRejectReason === "0") {
+      toast.error("Please select a reason for rejection");
+      return;
+    }
+    
+    if (selectedRejectReason === "8" && !rejectReason.trim()) {
+      toast.error("Please provide a custom reason for rejection");
       return;
     }
 
@@ -267,6 +319,8 @@ export default function AdminRecordList({ status = "pending" }) {
     }
     setOpenRejectDialog(false);
     setRejectReason("");
+    setSelectedRejectReason("0");
+    setShowCustomReasonField(false);
     setSelectedRecordId(null);
   };
 
@@ -411,94 +465,57 @@ export default function AdminRecordList({ status = "pending" }) {
         className="bg-gray-50 border rounded-md  overflow-hidden"
       >
         <div className="font-semibold border-b-2 text-[1.13vw] w-full" key="#">
-          <div className="p-1 px-4 flex gap-4 w-full items-center text-center justify-around">
+          <div className="p-1 px-4 flex items-center w-full">
             <div className="flex items-center gap-2 w-[15%]">
               <Checkbox
                 edge="start"
                 color="secondary"
                 checked={checked.indexOf("#") !== -1}
                 tabIndex={-1}
-                className=" "
                 onClick={handleToggle("#")}
                 disableRipple
               />
-              <div onClick={handleSortToggle} className="w-full">
+              <div onClick={handleSortToggle} className="cursor-pointer pl-1">
                 Name
               </div>
             </div>
-            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer">
-              No. of Guests
+            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer text-center">
+              #Guests
             </div>
-            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer">
-              No. of Rooms
+            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer text-center">
+              #Rooms
             </div>
-            <div onClick={handleSortToggle} className="w-[5%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer text-center">
               Category
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[11%] cursor-pointer text-center">
               Arrival Date
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
-              Departure Date
+            <div onClick={handleSortToggle} className="w-[11%] cursor-pointer text-center">
+              Deptarture Date
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[11%] cursor-pointer text-center">
               Room Type
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[13%] cursor-pointer text-center">
               Room Assigned
             </div>
-            <div className="flex justify-evenly gap-4 w-[10%]">
-              { checked.length === 0 && (
+            <div className="flex justify-end items-center w-[15%] gap-3 pr-2">
+              <IconButton size="small">
+                <InsertDriveFileIcon />
+              </IconButton>
+              <IconButton size="small">
+                <VisibilityIcon />
+              </IconButton>
+              { isAdminOrChairman && (
                 <>
-                  <IconButton>
-                    <InsertDriveFileIcon />
+                  <IconButton size="small">
+                    <DoneIcon className="text-green-500" />
                   </IconButton>
-                  <IconButton>
-                    <VisibilityIcon />
+                  <IconButton size="small">
+                    <CloseIcon className="text-red-500" />
                   </IconButton>
-                  { isAdminOrChairman && (
-                    <>
-                      <IconButton>
-                        <DoneIcon className="text-green-500" />
-                      </IconButton>
-                      <IconButton>
-                        <CloseIcon className="text-red-500" />
-                      </IconButton>
-                    </>
-                  )}
                 </>
-              )}
-              
-              { checked.length > 0 && isAdminOrChairman && (
-                <div className="flex">
-                  <IconButton edge="end" aria-label="comments">
-                    <DoneIcon
-                      className="text-green-500 h-5 mr-2"
-                      onClick={async () => {
-                        try {
-                          checked.forEach(async (record) => {
-                            if (record !== "#") {
-                              await http.put("/reservation/approve/" + record);
-                            }
-                          });
-                          toast.success("Requests Approved");
-                          window.location.reload();
-                        } catch (error) {
-                          console.log(error?.message);
-                        }
-                      }}
-                    />
-                  </IconButton>
-                  <IconButton edge="end" aria-label="comments">
-                    <CloseIcon
-                      className="text-red-400 h-5 ml-2"
-                      onClick={() => {
-                        setSelectedRecordId(null);
-                        setOpenRejectDialog(true);
-                      }}
-                    />
-                  </IconButton>
-                </div>
               )}
             </div>
           </div>
@@ -511,7 +528,7 @@ export default function AdminRecordList({ status = "pending" }) {
               return (
                 <div
                   key={record._id}
-                  className="border-b-[1px] border-gray-100 items-center flex gap-4 text-center px-4 p-1 text-[1vw] justify-around"
+                  className="border-b-[1px] border-gray-100 items-center flex text-[1vw] px-4 p-1"
                 >
                   <div className="flex items-center gap-2 w-[15%] overflow-hidden">
                     <Checkbox
@@ -522,28 +539,26 @@ export default function AdminRecordList({ status = "pending" }) {
                       disableRipple
                       inputProps={{ "aria-labelledby": labelId }}
                     />
-                    <div className="w-full">{record.guestName}</div>
+                    <div className="truncate pl-1">{record.guestName}</div>
                   </div>
-                  <div className="w-[8%]">{record.numberOfGuests}</div>
-                  <div className="w-[8%]">{record.numberOfRooms}</div>
-                  <div className="w-[5%]">{record.category}</div>
-                  <div className="w-[10%]">{getDate(record.arrivalDate)}</div>
-                  <div className="w-[10%]">{getDate(record.departureDate)}</div>
-                  <div className="w-[10%]">{record.roomType}</div>
-                  {record.bookings?.length > 0 && <div className="w-[10%]">Yes</div>}
-                  {record.bookings?.length <= 0 && <div className="w-[10%]">No</div>}
-                  <div className="flex justify-evenly gap-4 w-[10%]">
-                    <IconButton edge="end" aria-label="file">
+                  <div className="w-[8%] text-center">{record.numberOfGuests}</div>
+                  <div className="w-[8%] text-center">{record.numberOfRooms}</div>
+                  <div className="w-[8%] text-center">{record.category}</div>
+                  <div className="w-[11%] text-center">{getDate(record.arrivalDate)}</div>
+                  <div className="w-[11%] text-center">{getDate(record.departureDate)}</div>
+                  <div className="w-[11%] text-center">{record.roomType}</div>
+                  <div className="w-[13%] text-center">{record.bookings?.length > 0 ? "Yes" : "No"}</div>
+                  <div className="flex justify-end items-center w-[15%] gap-3 pr-2">
+                    <IconButton size="small">
                       <InsertDriveFileIcon
                         onClick={() => {
                           window.location.pathname.split("/").length === 3
                             ? navigate(`${record._id}`)
                             : navigate(`../${record._id}`);
                         }}
-                        color="black"
                       />
                     </IconButton>
-                    <IconButton edge="end" aria-label="preview">
+                    <IconButton size="small">
                       <VisibilityIcon
                         onClick={async () => {
                           try {
@@ -555,7 +570,6 @@ export default function AdminRecordList({ status = "pending" }) {
                             const fileName = record.name || "Document";
                             const contentType = res.headers["content-type"] || res.data.type;
                             
-                            // Check if it's a zip file
                             const isZip = contentType && (
                               contentType.includes("zip") || 
                               contentType.includes("application/octet-stream")
@@ -567,7 +581,6 @@ export default function AdminRecordList({ status = "pending" }) {
                             setPreviewFileName(`${fileName} (${contentType})`);
                             
                             if (isZip) {
-                              // Process zip file contents
                               await processZipFile(res.data);
                             }
                             
@@ -578,11 +591,10 @@ export default function AdminRecordList({ status = "pending" }) {
                             toast.error("Something went wrong");
                           }
                         }}
-                        color="black"
                       />
                     </IconButton>
                     { status !== "approved" && isAdminOrChairman && (
-                      <IconButton edge="end" aria-label="approve">
+                      <IconButton size="small">
                         <DoneIcon
                           className="text-green-500"
                           onClick={async () => {
@@ -602,7 +614,7 @@ export default function AdminRecordList({ status = "pending" }) {
                       </IconButton>
                     )}
                     { status !== "rejected" && isAdminOrChairman && (
-                      <IconButton edge="end" aria-label="reject">
+                      <IconButton size="small">
                         <CloseIcon
                           className="text-red-500"
                           onClick={() => handleRejectClick(record._id)}
@@ -610,8 +622,6 @@ export default function AdminRecordList({ status = "pending" }) {
                       </IconButton>
                     )}
                   </div>
-
-                  <div />
                 </div>
               );
             })}
@@ -657,31 +667,64 @@ export default function AdminRecordList({ status = "pending" }) {
           padding: '24px',
           paddingTop: '24px !important',
         }}>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Reason for Rejection"
-            type="text"
-            fullWidth
-            multiline
-            rows={4}
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            required
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                '&:hover fieldset': {
-                  borderColor: '#365899',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: '#365899',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
+          <FormControl fullWidth sx={{ mb: showCustomReasonField ? 2 : 0 }}>
+            <InputLabel id="rejection-reason-label" sx={{
+              '&.Mui-focused': {
                 color: '#365899',
               },
-            }}
-          />
+            }}>Select Reason for Rejection</InputLabel>
+            <Select
+              labelId="rejection-reason-label"
+              value={selectedRejectReason}
+              onChange={handleReasonChange}
+              label="Select Reason for Rejection"
+              sx={{
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#d1d5db',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#365899',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#365899',
+                },
+              }}
+            >
+              {rejectionReasons.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.reason}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {showCustomReasonField && (
+            <TextField
+              margin="dense"
+              label="Please specify the reason"
+              type="text"
+              fullWidth
+              multiline
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              required
+              sx={{
+                mt: 2,
+                '& .MuiOutlinedInput-root': {
+                  '&:hover fieldset': {
+                    borderColor: '#365899',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#365899',
+                  },
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: '#365899',
+                },
+              }}
+            />
+          )}
         </DialogContent>
         <DialogActions sx={{ 
           padding: '16px 24px',

@@ -61,8 +61,8 @@ export default function RecordList({ status = "pending", desc }) {
 
   const filterMap = {
     "Guest Name": "guestName",
-    "Number of Rooms": "numberOfRooms",
-    "Number of Guests": "numberOfGuests",
+    "#Rooms": "numberOfRooms",
+    "#Guests": "numberOfGuests",
     Category: "category",
     "Arrival Date": "arrivalDate",
     "Departure Date": "departureDate",
@@ -191,8 +191,8 @@ export default function RecordList({ status = "pending", desc }) {
 
   const options = [
     "Guest Name",
-    "Number of Rooms",
-    "Number of Guests",
+    "#Rooms",
+    "#Guests",
     "Category",
     ...(user.role !== "USER" ? ["Arrival Date", "Departure Date"] : []),
     "Room Type",
@@ -208,11 +208,11 @@ export default function RecordList({ status = "pending", desc }) {
     const handleSort = () => {
       const tempRecords = [...newRecords];
       if (sortToggle) {
-        if (sortType === "Number of Guests") {
+        if (sortType === "#Guests") {
           tempRecords.sort((a, b) => {
             return a.numberOfGuests - b.numberOfGuests;
           });
-        } else if (sortType === "Number of Rooms") {
+        } else if (sortType === "#Rooms") {
           tempRecords.sort((a, b) => {
             return a.numberOfRooms - b.numberOfRooms;
           });
@@ -231,11 +231,11 @@ export default function RecordList({ status = "pending", desc }) {
           });
         }
       } else {
-        if (sortType === "Number of Guests") {
+        if (sortType === "#Guests") {
           tempRecords.sort((a, b) => {
             return b.numberOfGuests - a.numberOfGuests;
           });
-        } else if (sortType === "Number of Rooms") {
+        } else if (sortType === "#Rooms") {
           tempRecords.sort((a, b) => {
             return b.numberOfRooms - a.numberOfRooms;
           });
@@ -476,7 +476,7 @@ export default function RecordList({ status = "pending", desc }) {
         {/* Header Row */}
         <div className="font-semibold border-b-2 text-[1.13vw] w-full h-15">
           <div className="p-1 px-4 flex gap-4 w-full items-center justify-around text-center">
-            <div className="flex items-center gap-2 w-[15%] overflow-hidden">
+            <div className="flex items-center gap-2 w-[15%] overflow-hidden pl-1">
               <Checkbox
                 edge="start"
                 color="secondary"
@@ -489,36 +489,36 @@ export default function RecordList({ status = "pending", desc }) {
                 Name
               </div>
             </div>
-            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer">
-              No. of Guests
+            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer pl-1">
+              #Guests
             </div>
-            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer">
-              No. of Rooms
+            <div onClick={handleSortToggle} className="w-[8%] cursor-pointer pl-1">
+              #Rooms
             </div>
-            <div onClick={handleSortToggle} className="w-[5%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[5%] cursor-pointer pl-1">
               Category
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer pl-1">
               Arrival Date
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer pl-1">
               Departure Date
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer pl-1">
               Room Type
             </div>
-            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer">
+            <div onClick={handleSortToggle} className="w-[10%] cursor-pointer pl-1">
               Room Assigned
             </div>
-            <div className="flex justify-evenly gap-4 w-[8%]">
-              <IconButton>
-                <InsertDriveFileIcon color="black" />
+            <div className="flex justify-evenly items-center gap-4 w-[8%]">
+              <IconButton size="small">
+                <InsertDriveFileIcon />
               </IconButton>
-              <IconButton>
-                <VisibilityIcon color="black" />
+              <IconButton size="small">
+                <VisibilityIcon />
               </IconButton>
               {status === "rejected" && (
-                <IconButton>
+                <IconButton size="small">
                   <EditIcon className="text-blue-500" />
                 </IconButton>
               )}
@@ -559,17 +559,17 @@ export default function RecordList({ status = "pending", desc }) {
                   ) : (
                     <div className="w-[10%]">No</div>
                   )}
-                  <div className="flex justify-evenly gap-4 w-[8%]">
-                    <IconButton
+                  <div className="flex justify-evenly items-center gap-4 w-[8%]">
+                    <IconButton size="small"
                       onClick={() => {
                         location.pathname.split("/").length === 3
                           ? navigate(`${record._id}`)
                           : navigate(`../${record._id}`);
                       }}
                     >
-                      <InsertDriveFileIcon color="black" />
+                      <InsertDriveFileIcon />
                     </IconButton>
-                    <IconButton
+                    <IconButton size="small"
                       onClick={async () => {
                         try {
                           setLoadingZip(true);
@@ -604,10 +604,10 @@ export default function RecordList({ status = "pending", desc }) {
                         }
                       }}
                     >
-                      <VisibilityIcon color="black" />
+                      <VisibilityIcon />
                     </IconButton>
                     {status === "rejected" && (
-                      <IconButton onClick={() => handleEditClick(record)}>
+                      <IconButton size="small" onClick={() => handleEditClick(record)}>
                         <EditIcon className="text-blue-500" />
                       </IconButton>
                     )}

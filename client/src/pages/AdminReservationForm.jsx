@@ -1,15 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.min.css";
 
 import {
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Checkbox,
-  ListItemText,
   TextField,
 } from "@mui/material";
 import "./Reservation_Form.css";
@@ -18,12 +16,11 @@ import InputFileUpload from "../components/uploadFile";
 import { useSelector } from "react-redux";
 import { privateRequest } from "../utils/useFetch";
 import { FileIcon, defaultStyles } from "react-file-icon";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ApplicantTable from "../components/ApplicantTable";
 import NewWindow from "../components/NewWindow";
-import { useEffect } from "react";
 
-function ReservationForm() {
+function AdminReservationForm() {
   const user = useSelector((state) => state.user);
   const http = privateRequest(user.accessToken, user.refreshToken);
   const navigate = useNavigate();
@@ -39,6 +36,10 @@ function ReservationForm() {
   }, [showTC, showCat]);
 
   const [files, setFiles] = useState([]);
+  const [signatureMethod, setSignatureMethod] = useState('none'); // 'none', 'type', 'upload'
+  const [signatureText, setSignatureText] = useState('');
+  const [signatureImage, setSignatureImage] = useState(null);
+
   const [formData, setFormData] = useState({
     guestName: "",
     address: "",
@@ -50,7 +51,7 @@ function ReservationForm() {
     departureDate: "",
     departureTime: "",
     purpose: "",
-    category: "A",
+    category: "ES-A",
     source: "GUEST",
     applicant: {
       name: "",
@@ -60,6 +61,7 @@ function ReservationForm() {
       mobile: "",
       email: "",
     },
+    signature: null, // Add signature property
   });
 
   const [errorText, setErrorText] = useState({
@@ -107,15 +109,18 @@ function ReservationForm() {
   };
 
   const categoryInfo = {
-    A: "Category A",
-    B: "Category B",
-    C: "Category C (For student's family only their parents are allowed)",
-    D: "Category D (Guest and Department invited, etc.)",
+    "ES-A": "Executive Suite - Category A (Free)",
+    "ES-B": "Executive Suite - Category B (₹3500)",
+    "BR-A": "Business Room - Category A (Free)",
+    "BR-B1": "Business Room - Category B1 (₹2000)",
+    "BR-B2": "Business Room - Category B2 (₹1200)",
   };
 
-  const catAReviewers = ["DIRECTOR", "REGISTRAR", "ASSOCIATE DEAN", "DEAN"];
-
-  const catBReviewers = ["HOD", "DEAN", "ASSOCIATE DEAN", "REGISTRAR"];
+  const catESAReviewers = ["DIRECTOR"];
+  const catESBReviewers = ["CHAIRMAN"];
+  const catBRAReviewers = ["REGISTRAR"];
+  const catBRB1Reviewers = ["DEAN"];
+  const catBRB2Reviewers = ["CHAIRMAN"];
 
   const Hods = [
     "COMPUTER SCIENCE",
@@ -151,38 +156,41 @@ function ReservationForm() {
     DEAN: Deans,
   };
 
-  const catCReviewers = ["CHAIRMAN"];
-  const catDReviewers = ["CHAIRMAN"];
-
-  const roomFareA = {
+  const roomFareESA = {
     "Single Occupancy": 0,
     "Double Occupancy": 0,
   };
-  const roomFareB = {
-    "Single Occupancy": 600,
-    "Double Occupancy": 850,
+  const roomFareESB = {
+    "Single Occupancy": 3500,
+    "Double Occupancy": 3500,
   };
-  const roomFareC = {
-    "Single Occupancy": 900,
-    "Double Occupancy": 1250,
+  const roomFareBRA = {
+    "Single Occupancy": 0,
+    "Double Occupancy": 0,
   };
-  const roomFareD = {
-    "Single Occupancy": 1300,
-    "Double Occupancy": 1800,
+  const roomFareBRB1 = {
+    "Single Occupancy": 2000,
+    "Double Occupancy": 2000,
+  };
+  const roomFareBRB2 = {
+    "Single Occupancy": 1200,
+    "Double Occupancy": 1200,
   };
 
   const catReviewers = {
-    A: catAReviewers,
-    B: catBReviewers,
-    C: catCReviewers,
-    D: catDReviewers,
+    "ES-A": catESAReviewers,
+    "ES-B": catESBReviewers,
+    "BR-A": catBRAReviewers,
+    "BR-B1": catBRB1Reviewers,
+    "BR-B2": catBRB2Reviewers,
   };
 
   const roomFare = {
-    A: roomFareA,
-    B: roomFareB,
-    C: roomFareC,
-    D: roomFareD,
+    "ES-A": roomFareESA,
+    "ES-B": roomFareESB,
+    "BR-A": roomFareBRA,
+    "BR-B1": roomFareBRB1,
+    "BR-B2": roomFareBRB2,
   };
 
   const [checkedValues, setCheckedValues] = useState([]);
@@ -193,13 +201,9 @@ function ReservationForm() {
     const { name, value } = e.target;
     console.log(name, value);
     if (name === "category") {
-      if (value === "C" || value === "D") {
-        setCheckedValues(["CHAIRMAN"]);
-        setSubRole(["Select"]);
-      } else {
-        setCheckedValues([]);
-        setSubRole([]);
-      }
+      const reviewers = catReviewers[value] || [];
+      setCheckedValues(reviewers);
+      setSubRole(Array(reviewers.length).fill("Select"));
     }
     setFormData({
       ...formData,
@@ -239,13 +243,10 @@ function ReservationForm() {
   };
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const receipt = await updateFilledPDF(formData);
-
-    //Handle form validation
-
+    
+    // Form validation
     let passed = true;
-
+    
     for (let [key, value] of Object.entries(formData)) {
       if (key === "files" || key === "receipt") {
         continue;
@@ -269,15 +270,14 @@ function ReservationForm() {
         }));
       }
     }
-
+    
     const arrivalDateTime = new Date(
       `${formData.arrivalDate}T${formData.arrivalTime || "13:00"}`
     );
     const departureDateTime = new Date(
       `${formData.departureDate}T${formData.departureTime || "11:00"}`
     );
-
-
+    
     // Check if departure is after arrival
     if (departureDateTime <= arrivalDateTime) {
       passed = false;
@@ -289,8 +289,7 @@ function ReservationForm() {
       toast.error("Departure should be After Arrival");
       return;
     }
-
-
+    
     for (let [index, reviewer] of checkedValues.entries()) {
       console.log(subroles[reviewer]);
       console.log(subRole[index]);
@@ -304,79 +303,148 @@ function ReservationForm() {
         return;
       }
     }
-
+    
     if (!passed) {
       toast.error("Please Fill All Necessary Fields Correctly.");
       return;
     }
-
+    
     // Handle form submission
     setLoading(true);
-
-    const toast_id = toast.loading("Submitting form...");
+    
+    // Show loading toast
+    const toast_id = toast.loading("Submitting reservation...");
 
     try {
-      const formDataToSend = new FormData();
-      Object.entries(formData).forEach(([fieldName, fieldValue]) => {
-        if (fieldName === "applicant")
-          formDataToSend.append(fieldName, JSON.stringify(fieldValue));
-        formDataToSend.append(fieldName, fieldValue);
-      });
-      for (const file of files) {
-        formDataToSend.append("files", file);
+      // Generate PDF receipt with better error handling
+      console.log("Attempting to generate receipt...");
+      const receipt = await updateFilledPDF(formData);
+      
+      if (!receipt) {
+        toast.update(toast_id, {
+          render: "Failed to generate receipt. Please ensure all fields are filled correctly.",
+          type: "error",
+          isLoading: false,
+          autoClose: 5000,
+        });
+        setLoading(false);
+        return;
       }
+      
+      console.log("Receipt generated successfully, creating file object...");
+      
+      // Create a File object from the receipt Blob with a unique filename
+      const timestamp = new Date().getTime();
+      const receiptFile = new File(
+        [receipt], 
+        `receipt_${timestamp}.pdf`, 
+        { type: "application/pdf" }
+      );
+      
+      console.log("Creating FormData for submission...");
+      const formDataToSend = new FormData();
+      
+      // Add form fields WITHOUT category mapping
+      Object.entries(formData).forEach(([fieldName, fieldValue]) => {
+        if (fieldName === "applicant") {
+          formDataToSend.append(fieldName, JSON.stringify(fieldValue));
+        } else {
+          // Use the original category value (no mapping)
+          formDataToSend.append(fieldName, fieldValue);
+        }
+      });
+      
+      // Calculate total amount based on room type, number of rooms, and duration
+      const arrivalDateTime = new Date(
+        `${formData.arrivalDate}T${formData.arrivalTime || "13:00"}`
+      );
+      const departureDateTime = new Date(
+        `${formData.departureDate}T${formData.departureTime || "11:00"}`
+      );
+      
+      // Calculate duration in days
+      const durationMs = departureDateTime - arrivalDateTime;
+      const durationDays = Math.ceil(durationMs / (1000 * 60 * 60 * 24));
+      
+      // Calculate room cost
+      const roomRate = roomFare[formData.category][formData.roomType];
+      const numberOfRooms = parseInt(formData.numberOfRooms) || 1;
+      const totalAmount = roomRate * numberOfRooms * durationDays;
+      
+      // Add the amount to form data
+      formDataToSend.append("amount", totalAmount);
+      
+      console.log("Room rate:", roomRate, "Number of rooms:", numberOfRooms, "Duration:", durationDays, "Total amount:", totalAmount);
+      
+      // Add uploaded files
+      if (files.length > 0) {
+        console.log(`Adding ${files.length} attachment files`);
+        for (const file of files) {
+          formDataToSend.append("files", file);
+        }
+      }
+      
+      // Add reviewers and subroles
       formDataToSend.append("reviewers", checkedValues);
       formDataToSend.append("subroles", subRole);
-      formDataToSend.append("receipt", receipt);
-      const res = await http.post("reservation/", formDataToSend, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      console.log(res.status);
-      if (res.status === 200) {
-        // toast.success("Form submitted successfully!");
-        console.log("success1");
+      
+      // Add receipt file
+      formDataToSend.append("receipt", receiptFile);
+
+      console.log("Submitting form data to server...");
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      try {
+        const res = await http.post("reservation/", formDataToSend, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        console.log("Server response:", res.status, res.data);
         toast.update(toast_id, {
-          render: "Form submitted successfully!",
+          render: "Reservation submitted successfully!",
           type: "success",
           isLoading: false,
           autoClose: 3000,
         });
         setLoading(false);
-        // navigate("..");
-      } else {
-        console.log("fail");
-
-        toast.update(toast_id, {
-          render: "Form submission failed.",
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
+        navigate("..");
+      } catch (error) {
+        clearTimeout(timeoutId);
+        console.error("Form submission error:", error);
+        
+        if (error.name === 'AbortError') {
+          toast.update(toast_id, {
+            render: "Request timed out. Please try again later.",
+            type: "error",
+            isLoading: false,
+            autoClose: 5000,
+          });
+        } else {
+          toast.update(toast_id, {
+            render: error.response?.data?.message || "Network error. Please try again.",
+            type: "error",
+            isLoading: false,
+            autoClose: 5000,
+          });
+        }
+        setLoading(false);
       }
     } catch (error) {
-      console.error("Form submission failed:", error);
+      console.error("PDF generation error:", error);
+      toast.update(toast_id, {
+        render: "Failed to prepare form. Please try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
       setLoading(false);
-
-      if (error.response?.data?.message) {
-        console.log("fail1");
-        toast.update(toast_id, {
-          render: error.response.data.message,
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      } else {
-        console.log("fail2");
-
-        toast.update(toast_id, {
-          render: "Form submission failed.",
-          type: "error",
-          isLoading: false,
-          autoClose: 5000,
-        });
-      }
     }
   };
 
@@ -386,6 +454,100 @@ function ReservationForm() {
     // setShowCheckbox(false);
     setShowCheckbox(true);
   }, [formData.category]);
+
+  // Enhanced autofill handler function
+  const handleAutofill = () => {
+    // Get current user data from Redux store
+    const userData = user;
+    
+    // Determine department from role if possible
+    let department = "";
+    if (userData.role && userData.role.startsWith("HOD_")) {
+      // Extract department from HOD role (e.g., HOD_COMPUTER_SCIENCE)
+      department = userData.role.replace("HOD_", "").replace(/_/g, " ");
+    } else if (userData.department) {
+      department = userData.department;
+    }
+    
+    // Determine designation from role if possible
+    let designation = "";
+    if (userData.role) {
+      if (userData.role.startsWith("HOD_")) {
+        designation = "HOD";
+      } else if (userData.role === "DEAN") {
+        designation = "DEAN";
+      } else if (userData.role === "DIRECTOR") {
+        designation = "DIRECTOR";
+      } else if (userData.role === "REGISTRAR") {
+        designation = "REGISTRAR";
+      } else if (userData.designation) {
+        designation = userData.designation;
+      }
+    }
+    
+    // Update applicant data with user information
+    setFormData(prev => ({
+      ...prev,
+      applicant: {
+        name: userData.name || "",
+        email: userData.email || "",
+        mobile: userData.contact || "",
+        department: department || prev.applicant.department || "",
+        designation: designation || prev.applicant.designation || "",
+        code: userData.employeeId || userData.studentId || prev.applicant.code || "",
+      }
+    }));
+    
+    toast.info("Details autofilled from your profile");
+  };
+
+  // Function to handle text signature
+  const saveTextSignature = () => {
+    if (signatureText.trim()) {
+      setFormData(prevData => ({
+        ...prevData,
+        signature: {
+          type: 'text',
+          data: signatureText
+        }
+      }));
+      toast.success("Signature saved");
+    } else {
+      toast.error("Please enter your name for the signature");
+    }
+  };
+  
+  // Function to handle signature image upload
+  const handleSignatureUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.match('image.*')) {
+        toast.error("Please upload an image file");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          setSignatureImage(e.target.result);
+          setFormData(prevData => ({
+            ...prevData,
+            signature: {
+              type: 'image',
+              data: e.target.result
+            }
+          }));
+          toast.success("Signature uploaded");
+        };
+        img.onerror = () => {
+          toast.error("Invalid image file");
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="w-full">
@@ -540,35 +702,32 @@ function ReservationForm() {
                 onChange={handleChange}
                 value={formData.roomType}
               >
-                <option className="" value="Single Occupancy">
-                  {formData.category !== "A" && (
+                <option value="Single Occupancy">
+                  {formData.category === "ES-A" || formData.category === "BR-A" ? (
+                    <span>Single Occupancy (Free)</span>
+                  ) : (
                     <span>
-                      Single Occupancy (Rs.
+                      Single Occupancy (₹
                       {roomFare[formData.category]["Single Occupancy"]}/- only)
                     </span>
                   )}
-                  {formData.category === "A" && (
-                    <span>Single Occupancy (Free)</span>
-                  )}
                 </option>
-                <option className="" value="Double Occupancy">
-                  {formData.category !== "A" && (
+                <option value="Double Occupancy">
+                  {formData.category === "ES-A" || formData.category === "BR-A" ? (
+                    <span>Double Occupancy (Free)</span>
+                  ) : (
                     <span>
-                      Double Occupancy (Rs.
+                      Double Occupancy (₹
                       {roomFare[formData.category]["Double Occupancy"]}/- only)
                     </span>
-                  )}
-                  {formData.category === "A" && (
-                    <span>Double Occupancy (Free)</span>
                   )}
                 </option>
               </select>
             </div>
-            {showCheckbox &&
-              (formData.category === "A" || formData.category === "B") && (
+            {showCheckbox && (
                 <div className="w-full p-2 mb-5">
                   <ul className="flex flex-col flex-wrap justify-start gap-1">
-                    {catReviewers[formData.category].map((reviewer) => (
+                    {catReviewers[formData.category]?.map((reviewer) => (
                       <li
                         key={reviewer}
                         className="flex justify-start gap-1 items-center"
@@ -584,84 +743,6 @@ function ReservationForm() {
                         <label className="w-32" htmlFor={reviewer}>
                           {reviewer}
                         </label>
-                        {reviewer === "ASSOCIATE DEAN" &&
-                          checkedValues.includes("ASSOCIATE DEAN") && (
-                            <FormControl>
-                              <Select
-                                labelId="sub-role-label"
-                                id="sub-role-select"
-                                value={
-                                  subRole[
-                                    checkedValues.indexOf("ASSOCIATE DEAN")
-                                  ] || "Select"
-                                }
-                                onChange={(e) =>
-                                  handleSubRoleChange(e, reviewer)
-                                }
-                              >
-                                <MenuItem value="Select">Select</MenuItem>
-                                <MenuItem value="HOSTEL MANAGEMENT">
-                                  Hostel Management
-                                </MenuItem>
-                                <MenuItem value="CONTINUING EDUCATION AND OUTREACH ACTIVITIES">
-                                  Continuing Education and Outreach Activities
-                                </MenuItem>
-                                <MenuItem value="INTERNATIONAL RELATIONS AND ALUMNI AFFAIRS">
-                                  International Relations and Alumni Affairs
-                                </MenuItem>
-                                <MenuItem value="INFRASTRUCTURE">
-                                  Infrastructure
-                                </MenuItem>
-                              </Select>
-                            </FormControl>
-                          )}
-                        {reviewer === "HOD" &&
-                          checkedValues.includes("HOD") && (
-                            <FormControl>
-                              <Select
-                                labelId="sub-role-label"
-                                id="sub-role-select"
-                                value={
-                                  subRole[checkedValues.indexOf("HOD")] ||
-                                  "Select"
-                                }
-                                onChange={(e) =>
-                                  handleSubRoleChange(e, reviewer)
-                                }
-                              >
-                                <MenuItem value="Select">Select</MenuItem>
-                                <MenuItem value="COMPUTER SCIENCE">
-                                  Computer Science
-                                </MenuItem>
-                                <MenuItem value="ELECTRICAL ENGINEERING">
-                                  Electrical Engineering
-                                </MenuItem>
-                                <MenuItem value="MECHANICAL ENGINEERING">
-                                  Mechanical Engineering
-                                </MenuItem>
-                                <MenuItem value="CHEMISTRY">Chemistry</MenuItem>
-                                <MenuItem value="MATHEMATICS">
-                                  Mathematics
-                                </MenuItem>
-                                <MenuItem value="PHYSICS">Physics</MenuItem>
-                                <MenuItem value="HUMANITIES AND SOCIAL SCIENCES">
-                                  Humanities and Social Sciences
-                                </MenuItem>
-                                <MenuItem value="BIOMEDICAL ENGINEERING">
-                                  Biomedical Engineering
-                                </MenuItem>
-                                <MenuItem value="CIVIL ENGINEERING">
-                                  Civil Engineering
-                                </MenuItem>
-                                <MenuItem value="CHEMICAL ENGINEERING">
-                                  Chemical Engineering
-                                </MenuItem>
-                                <MenuItem value="METALLURGICAL AND MATERIALS ENGINEERING">
-                                  Metallurgical & Materials Engineering
-                                </MenuItem>
-                              </Select>
-                            </FormControl>
-                          )}
                         {reviewer === "DEAN" &&
                           checkedValues.includes("DEAN") && (
                             <FormControl>
@@ -700,9 +781,9 @@ function ReservationForm() {
                   </ul>
                 </div>
               )}
-            {(formData.category === "B" ||
-              formData.category === "C" ||
-              formData.category === "D") && (
+            {(formData.category === "ES-B" ||
+              formData.category === "BR-B1" ||
+              formData.category === "BR-B2") && (
               <>
                 <label>Payment*:</label>
 
@@ -710,13 +791,11 @@ function ReservationForm() {
                   name="source"
                   className="w-full h-12 border rounded-md border-gray-300 p-2 mb-5 whitespace-pre"
                   onChange={handleChange}
-                  value={formData.paymentType}
+                  value={formData.source}
                 >
                   <option value="GUEST">Paid by guest</option>
                   <option value="DEPARTMENT">Paid by department</option>
-                  {formData.category === "B" && (
-                    <option value="OTHERS">Paid by other sources</option>
-                  )}
+                  <option value="OTHERS">Paid by other sources</option>
                 </select>
               </>
             )}
@@ -752,9 +831,9 @@ function ReservationForm() {
                     );
                   })}
                 </div>
-              ) : formData.category === "A" || formData.category === "B" ? (
+              ) : formData.category === "ES-A" || formData.category === "ES-B" ? (
                 <div className="flex items-center text-gray-500">
-                  *Uploading attachments is mandatory for category A and B (size
+                  *Uploading attachments is mandatory for category ES-A and ES-B (size
                   limit: 2MB)
                 </div>
               ) : (
@@ -764,7 +843,19 @@ function ReservationForm() {
               )}
             </div>
             <div className="mt-5 flex flex-col gap-2">
-              <div>Applicant/Proposer Details:</div>
+              <div className="flex justify-between items-center">
+                <div>Applicant/Proposer Details:</div>
+                <button 
+                  type="button"
+                  onClick={handleAutofill}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center gap-1"
+                >
+                  <span>Autofill My Details</span> 
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+                  </svg>
+                </button>
+              </div>
               <div>
                 <ApplicantTable
                   entry={formData.applicant}
@@ -775,7 +866,92 @@ function ReservationForm() {
               </div>
             </div>
           </div>
-
+          
+          {/* Signature Section */}
+          <div className="mt-5 border p-4 rounded-md">
+            <h3 className="font-semibold mb-3">Applicant Signature*:</h3>
+            
+            <div className="flex gap-4 mb-4">
+              <button 
+                type="button"
+                onClick={() => setSignatureMethod('type')}
+                className={`px-3 py-2 rounded-md ${signatureMethod === 'type' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              >
+                Type Signature
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => setSignatureMethod('upload')}
+                className={`px-3 py-2 rounded-md ${signatureMethod === 'upload' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              >
+                Upload Signature
+              </button>
+            </div>
+            
+            {signatureMethod === 'type' && (
+              <div className="mb-4">
+                <input
+                  type="text"
+                  placeholder="Type your name"
+                  value={signatureText}
+                  onChange={(e) => setSignatureText(e.target.value)}
+                  className="w-full p-2 border rounded-md mb-2 font-signature text-xl"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={saveTextSignature}
+                    className="bg-green-500 text-white px-4 py-2 rounded-md"
+                  >
+                    Save Signature
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSignatureText('')}
+                    className="bg-red-500 text-white px-4 py-2 rounded-md"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {signatureText && (
+                  <div className="mt-3 p-3 border rounded-md">
+                    <p className="font-signature text-xl">{signatureText}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {signatureMethod === 'upload' && (
+              <div className="mb-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSignatureUpload}
+                  className="w-full p-2 border rounded-md mb-2"
+                />
+                <p className="text-gray-500 text-sm">
+                  Please upload a clear image of your signature (JPG, PNG or GIF format)
+                </p>
+              </div>
+            )}
+            
+            {formData.signature && (
+              <div className="mt-3 p-3 border rounded-md">
+                <p className="font-semibold mb-2">Your saved signature:</p>
+                {formData.signature.type === 'image' ? (
+                  <img 
+                    src={formData.signature.data} 
+                    alt="Signature" 
+                    className="max-h-20" 
+                  />
+                ) : (
+                  <p className="font-signature text-xl">{formData.signature.data}</p>
+                )}
+              </div>
+            )}
+          </div>
+          
           <div>
             By clicking on Submit, you hereby agree to the{" "}
             <span
@@ -811,4 +987,4 @@ function ReservationForm() {
   );
 }
 
-export default ReservationForm;
+export default AdminReservationForm;

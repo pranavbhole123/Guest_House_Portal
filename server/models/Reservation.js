@@ -44,7 +44,7 @@ const reservationSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["A", "B", "C", "D"], // Assuming only three types for simplicity
+      enum: ["ES-A", "ES-B", "BR-A", "BR-B1", "BR-B2"],
     },
     status: {
       type: String,

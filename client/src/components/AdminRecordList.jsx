@@ -547,7 +547,21 @@ export default function AdminRecordList({ status = "pending" }) {
                   <div className="w-[11%] text-center">{getDate(record.arrivalDate)}</div>
                   <div className="w-[11%] text-center">{getDate(record.departureDate)}</div>
                   <div className="w-[11%] text-center">{record.roomType}</div>
-                  <div className="w-[13%] text-center">{record.bookings?.length > 0 ? "Yes" : "No"}</div>
+                  <div className="w-[13%] text-center">
+                    {record.bookings?.length > 0 
+                      ? (
+                        <div>
+                          {record.bookings.map((booking, index) => (
+                            <span key={index} className="text-green-600">
+                              {booking.roomNumber}
+                              {index < record.bookings.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
+                        </div>
+                      ) 
+                      : "No"
+                    }
+                  </div>
                   <div className="flex justify-end items-center w-[15%] gap-3 pr-2">
                     <IconButton size="small">
                       <InsertDriveFileIcon

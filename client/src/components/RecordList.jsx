@@ -313,10 +313,11 @@ export default function RecordList({ status = "pending", desc }) {
   };
 
   const categoryInfo = {
-    A: "Category A",
-    B: "Category B",
-    C: "Category C (For student's family only their parents are allowed)",
-    D: "Category D (Guest and Department invited, etc.)",
+    "ES-A": "Executive Suite - Category A (Free)",
+    "ES-B": "Executive Suite - Category B (₹3500)",
+    "BR-A": "Business Room - Category A (Free)",
+    "BR-B1": "Business Room - Category B1 (₹2000)",
+    "BR-B2": "Business Room - Category B2 (₹1200)"
   };
 
   // Function to process zip file contents
@@ -555,7 +556,14 @@ export default function RecordList({ status = "pending", desc }) {
                   <div className="w-[10%]">{getDate(record.departureDate)}</div>
                   <div className="w-[10%]">{record.roomType}</div>
                   {record.bookings?.length > 0 ? (
-                    <div className="w-[10%]">Yes</div>
+                    <div className="w-[10%]">
+                      {record.bookings.map((booking, index) => (
+                        <span key={index} className="text-green-600">
+                          {booking.roomNumber}
+                          {index < record.bookings.length - 1 ? ", " : ""}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
                     <div className="w-[10%]">No</div>
                   )}
@@ -697,7 +705,7 @@ export default function RecordList({ status = "pending", desc }) {
           <FormControl fullWidth margin="normal">
             <InputLabel>Category</InputLabel>
             <Select
-              value={editFormData.category || "A"}
+              value={editFormData.category || "ES-A"}
               onChange={(e) =>
                 setEditFormData({ ...editFormData, category: e.target.value })
               }
@@ -710,10 +718,10 @@ export default function RecordList({ status = "pending", desc }) {
             </Select>
           </FormControl>
   
-          {/* Payment Options for categories B, C, D */}
-          {(editFormData.category === "B" ||
-            editFormData.category === "C" ||
-            editFormData.category === "D") && (
+          {/* Payment Options for categories ES-B, BR-B1, BR-B2 */}
+          {(editFormData.category === "ES-B" ||
+            editFormData.category === "BR-B1" ||
+            editFormData.category === "BR-B2") && (
             <FormControl fullWidth margin="normal">
               <InputLabel>Payment Source</InputLabel>
               <Select
@@ -724,7 +732,7 @@ export default function RecordList({ status = "pending", desc }) {
               >
                 <MenuItem value="GUEST">Paid by guest</MenuItem>
                 <MenuItem value="DEPARTMENT">Paid by department</MenuItem>
-                {editFormData.category === "B" && (
+                {editFormData.category === "ES-B" && (
                   <MenuItem value="OTHERS">Paid by other sources</MenuItem>
                 )}
               </Select>
@@ -763,8 +771,8 @@ export default function RecordList({ status = "pending", desc }) {
               </div>
             ) : (
               <div className="flex items-center text-gray-500">
-                {(editFormData.category === "A" || editFormData.category === "B")
-                  ? "*Uploading attachments is mandatory for category A and B (size limit: 2MB)"
+                {(editFormData.category === "ES-A" || editFormData.category === "ES-B")
+                  ? "*Uploading attachments is mandatory for category ES-A and ES-B (size limit: 2MB)"
                   : "File size limit: 2MB"}
               </div>
             )}
@@ -800,7 +808,7 @@ export default function RecordList({ status = "pending", desc }) {
             onClick={handleEditSubmit}
             color="primary"
             disabled={
-              (editFormData.category === "A" || editFormData.category === "B") &&
+              (editFormData.category === "ES-A" || editFormData.category === "ES-B") &&
               files.length === 0 &&
               (!editFormData.documents || editFormData.documents.length === 0)
             }

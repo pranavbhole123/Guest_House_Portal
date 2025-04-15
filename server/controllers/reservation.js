@@ -45,6 +45,10 @@ export async function createReservation(req, res) {
     //user details are contained in req.user
     //console.dir(req, { depth: null, colors: true });
   
+    // Check if required files and data are available before proceeding
+    if (!req.files) {
+      return res.status(400).json({ message: "No files were uploaded" });
+    }
 
     const {
       numberOfGuests,
@@ -64,8 +68,11 @@ export async function createReservation(req, res) {
       source,
     } = req.body;
 
+    // Validate required fields
+    if (!guestName || !arrivalDate || !departureDate || !category) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
   
-    var room_cost;
     const ms = Number(
       new Date(departureDate).getTime() - new Date(arrivalDate).getTime()
     );
@@ -73,42 +80,67 @@ export async function createReservation(req, res) {
     const days = Number(ms / (1000 * 60 * 60 * 24));
     //console.log(days);
 
-    if (roomType == "Single Occupancy") {
-      if (category == "A") room_cost = 0;
-      else if (category == "B") room_cost = 600 * numberOfRooms * days;
-      else if (category == "C") room_cost = 900 * numberOfRooms * days;
-      else if (category == "D") room_cost = 1300 * numberOfRooms * days;
-    } else {
-      if (category == "A") room_cost = 0;
-      else if (category == "B") room_cost = 850 * numberOfRooms * days;
-      else if (category == "C") room_cost = 1250 * numberOfRooms * days;
-      else if (category == "D") room_cost = 1800 * numberOfRooms * days;
-    }
-    //single rooms cost
+    // Calculate room cost using the helper function
+    const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
     
     let applicantData;
-    if (applicant[0]) applicantData = applicant[0];
-    console.log(typeof(applicantData));
+    if (typeof applicant === 'string') {
+      try {
+        applicantData = JSON.parse(applicant);
+      } catch (err) {
+        console.error("Error parsing applicant JSON:", err);
+      }
+    } else if (applicant && applicant[0]) {
+      applicantData = applicant[0];
+    }
+    
+    console.log("Applicant data:", typeof(applicantData), applicantData);
 
     const email = req.user.email;
-    const receiptid = req.files["receipt"][0].id;
-    const fileids = req.files["files"]?.map((f) => ({
-      refid: f.id,
-      extension: f.originalname.split(".")[1],
-    }));
-    console.log(reviewers);
-    console.log(subroles);
-    let subrolesArray = subroles.split(",");
-    let reviewersArray = reviewers.split(",").map((role, index) => ({
+    
+    // Fix: Add proper null checks for receipt and files
+    let receiptid = null;
+    if (req.files && req.files["receipt"] && req.files["receipt"][0]) {
+      receiptid = req.files["receipt"][0].id;
+    } else {
+      return res.status(400).json({ message: "Receipt file is required" });
+    }
+    
+    let fileids = [];
+    if (req.files && req.files["files"]) {
+      fileids = req.files["files"].map((f) => ({
+        refid: f.id,
+        extension: f.originalname ? f.originalname.split(".").pop() : "",
+      }));
+    }
+    
+    // Check if reviewers and subroles are provided
+    if (!reviewers) {
+      return res.status(400).json({ message: "Reviewers are required" });
+    }
+    
+    console.log("Reviewers:", reviewers);
+    console.log("Subroles:", subroles);
+    
+    let subrolesArray = subroles ? subroles.split(",") : [];
+    let reviewersArray = reviewers ? reviewers.split(",").map((role, index) => ({
       role:
         role +
-        (subrolesArray[index] !== "Select" ? " " + subrolesArray[index] : ""),
+        (subrolesArray[index] && subrolesArray[index] !== "Select" ? " " + subrolesArray[index] : ""),
       comments: "",
       status: "PENDING",
-    }));
+    })) : [];
 
-    if (req.user.role === "ADMIN")
+    if (req.user.role === "ADMIN") {
+      // First, add ADMIN as a reviewer
       reviewersArray = [{ role: "ADMIN", comments: "", status: "PENDING" }];
+      
+      // For specific categories, add CHAIRMAN as a reviewer too
+      if (category === "ES-B" || category === "BR-A" || category === "BR-B1" || 
+          category === "BR-B2") {
+        reviewersArray.push({ role: "CHAIRMAN", comments: "", status: "PENDING" });
+      }
+    }
    
     const reservation = await Reservation.create({
       srno: 1,
@@ -1124,24 +1156,34 @@ export const editReservation = async (req, res) => {
       }
     }
 
-    // Handle file uploads
+    // Handle file uploads with proper null checks
     let newFiles = [];
-    if (req.files?.files) {
+    if (req.files && req.files.files) {
       // Handle single file
       if (!Array.isArray(req.files.files)) {
         const file = req.files.files;
-        newFiles.push({
-          refid: file.id,
-          extension: file.originalname.split('.').pop()
-        });
+        if (file && file.id) {
+          newFiles.push({
+            refid: file.id,
+            extension: file.originalname ? file.originalname.split('.').pop() : ''
+          });
+        }
       } 
       // Handle multiple files
       else {
-        newFiles = req.files.files.map(file => ({
-          refid: file.id,
-          extension: file.originalname.split('.').pop()
-        }));
+        newFiles = req.files.files
+          .filter(file => file && file.id) // Ensure file has an id
+          .map(file => ({
+            refid: file.id,
+            extension: file.originalname ? file.originalname.split('.').pop() : ''
+          }));
       }
+    }
+
+    // Handle receipt file if it exists
+    let receiptId = existingReservation.receipt;
+    if (req.files && req.files.receipt && req.files.receipt[0] && req.files.receipt[0].id) {
+      receiptId = req.files.receipt[0].id;
     }
 
     // Calculate room cost
@@ -1149,32 +1191,25 @@ export const editReservation = async (req, res) => {
       new Date(req.body.departureDate).getTime() - new Date(req.body.arrivalDate).getTime()
     );
     const days = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
-    let room_cost = 0;
-    console.log(days)
-
-    if (existingReservation.roomType === "Single Occupancy") {
-      if (req.body.category === "A") room_cost = 0;
-      else if (req.body.category === "B") room_cost = 600 * existingReservation.numberOfRooms * days;
-      else if (req.body.category === "C") room_cost = 900 * existingReservation.numberOfRooms * days;
-      else if (req.body.category === "D") room_cost = 1300 * existingReservation.numberOfRooms * days;
-    } else {
-      if (req.body.category === "A") room_cost = 0;
-      else if (req.body.category === "B") room_cost = 850 * existingReservation.numberOfRooms * days;
-      else if (req.body.category === "C") room_cost = 1250 * existingReservation.numberOfRooms * days;
-      else if (req.body.category === "D") room_cost = 1800 * existingReservation.numberOfRooms * days;
-    }
+    
+    // Use calculateRoomCost helper function
+    const roomType = req.body.roomType || existingReservation.roomType;
+    const category = req.body.category || existingReservation.category;
+    const numberOfRooms = req.body.numberOfRooms || existingReservation.numberOfRooms;
+    const room_cost = calculateRoomCost(category, roomType, numberOfRooms, days);
 
     console.log('Days:', days);
-    console.log('Room type:', req.body.roomType);
-    console.log('Category:', req.body.category);
-    console.log('Number of rooms:', req.body.numberOfRooms);
+    console.log('Room type:', roomType);
+    console.log('Category:', category);
+    console.log('Number of rooms:', numberOfRooms);
+    console.log('Room cost:', room_cost);
 
-    // Validate files for categories A and B
-    if ((req.body.category === 'A' || req.body.category === 'B') && 
+    // Validate files for categories ES-A and ES-B
+    if ((req.body.category === 'ES-A' || req.body.category === 'ES-B') && 
         newFiles.length === 0 && 
         (!existingReservation.files || existingReservation.files.length === 0)) {
       return res.status(400).json({ 
-        message: "Supporting documents are required for Category A and B" 
+        message: "Supporting documents are required for Executive Suite categories" 
       });
     }
 
@@ -1184,11 +1219,12 @@ export const editReservation = async (req, res) => {
     // Ensure both admin and chairman are added as reviewers when form is edited
     reviewersArray.push({ role: "ADMIN", comments: "Form edited by user", status: "PENDING" });
     
-    // For category C and D, always add chairman
-    if (req.body.category === 'C' || req.body.category === 'D') {
+    // For specific categories, always add chairman
+    if (req.body.category === 'BR-A' || req.body.category === 'BR-B1' || 
+        req.body.category === 'BR-B2' || req.body.category === 'ES-B') {
       reviewersArray.push({ role: "CHAIRMAN", comments: "Form edited by user", status: "PENDING" });
     } else {
-      // For categories A and B, check if chairman was previously a reviewer
+      // For category ES-A, check if chairman was previously a reviewer
       const wasChairmanReviewer = existingReservation.reviewers.some(
         reviewer => reviewer.role === "CHAIRMAN" || reviewer.role.startsWith("CHAIRMAN ")
       );
@@ -1206,6 +1242,7 @@ export const editReservation = async (req, res) => {
       stepsCompleted: 1,
       reviewers: reviewersArray,
       files: [...(existingReservation.files || []), ...newFiles],
+      receipt: receiptId,  // Use the updated receipt ID
       payment: {
         ...existingReservation.payment,
         amount: room_cost,
@@ -1234,20 +1271,30 @@ export const editReservation = async (req, res) => {
 };
 
 // Helper function to calculate room cost
-const calculateRoomCost = (category, roomType, numberOfRooms, days) => {
-  let baseRate = 0;
+function calculateRoomCost(category, roomType, numberOfRooms, days) {
+  let baseCost = 0;
   
-  if (roomType === "Single Occupancy") {
-    if (category === "A") baseRate = 0;
-    else if (category === "B") baseRate = 600;
-    else if (category === "C") baseRate = 900;
-    else if (category === "D") baseRate = 1300;
-  } else {
-    if (category === "A") baseRate = 0;
-    else if (category === "B") baseRate = 850;
-    else if (category === "C") baseRate = 1250;
-    else if (category === "D") baseRate = 1800;
+  // Set base cost according to category
+  switch(category) {
+    case "ES-A":
+      baseCost = 0; // Free
+      break;
+    case "ES-B":
+      baseCost = 3500;
+      break;
+    case "BR-A":
+      baseCost = 0; // Free
+      break;
+    case "BR-B1":
+      baseCost = 2000;
+      break;
+    case "BR-B2":
+      baseCost = 1200;
+      break;
+    default:
+      baseCost = 0;
   }
-
-  return baseRate * numberOfRooms * days;
-};
+  
+  // Calculate total cost
+  return baseCost * numberOfRooms * days;
+}
